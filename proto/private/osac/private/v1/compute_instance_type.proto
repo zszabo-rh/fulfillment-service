@@ -88,6 +88,21 @@ message ComputeInstanceStatus {
   string hub = 4;
 
   optional google.protobuf.Timestamp last_restarted_at = 5;
+
+  // Reference to the KubeVirt VirtualMachine on the hub cluster.
+  optional ComputeInstanceVMReference vm_reference = 6;
+}
+
+// Contains a reference to the KubeVirt VirtualMachine on the hub cluster.
+message ComputeInstanceVMReference {
+  // Identifier of the hub cluster.
+  string hub_id = 1;
+
+  // Namespace containing the VirtualMachine.
+  string namespace = 2;
+
+  // Name of the KubeVirt VirtualMachine.
+  string vm_name = 3;
 }
 
 enum ComputeInstanceState {
