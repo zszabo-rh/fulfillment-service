@@ -411,6 +411,104 @@ var _ = Describe("Generic mapper", func() {
 	)
 
 	DescribeTable(
+		"CopyUpdate cluster public to private (map fields)",
+		func(from *publicv1.Cluster, to *privatev1.Cluster, expected *privatev1.Cluster) {
+			mapper, err := NewGenericMapper[*publicv1.Cluster, *privatev1.Cluster]().
+				SetLogger(logger).
+				SetStrict(false).
+				Build()
+			Expect(err).ToNot(HaveOccurred())
+			err = mapper.CopyUpdate(ctx, from, to)
+			Expect(err).ToNot(HaveOccurred())
+			marshalOptions := protojson.MarshalOptions{
+				UseProtoNames: true,
+			}
+			actualJson, err := marshalOptions.Marshal(to)
+			Expect(err).ToNot(HaveOccurred())
+			expectedJson, err := marshalOptions.Marshal(expected)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(actualJson).To(MatchJSON(expectedJson))
+		},
+		Entry(
+			"Preserves absent map field",
+			// From: spec without node_sets
+			publicv1.Cluster_builder{
+				Spec: publicv1.ClusterSpec_builder{
+					Template: "my_template",
+				}.Build(),
+			}.Build(),
+			// To: existing object with node_sets
+			privatev1.Cluster_builder{
+				Id: "existing-id",
+				Spec: privatev1.ClusterSpec_builder{
+					Template: "old_template",
+					NodeSets: map[string]*privatev1.ClusterNodeSet{
+						"compute": privatev1.ClusterNodeSet_builder{
+							Size: 3,
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Expected: node_sets preserved, template updated
+			privatev1.Cluster_builder{
+				Id: "existing-id",
+				Spec: privatev1.ClusterSpec_builder{
+					Template: "my_template",
+					NodeSets: map[string]*privatev1.ClusterNodeSet{
+						"compute": privatev1.ClusterNodeSet_builder{
+							Size: 3,
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+		),
+		Entry(
+			"Overlays present map field (upserts keys, preserves target-only keys)",
+			// From: node_sets with one key
+			publicv1.Cluster_builder{
+				Spec: publicv1.ClusterSpec_builder{
+					Template: "my_template",
+					NodeSets: map[string]*publicv1.ClusterNodeSet{
+						"compute": publicv1.ClusterNodeSet_builder{
+							Size: 5,
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// To: existing object with two keys (compute + gpu)
+			privatev1.Cluster_builder{
+				Id: "existing-id",
+				Spec: privatev1.ClusterSpec_builder{
+					Template: "my_template",
+					NodeSets: map[string]*privatev1.ClusterNodeSet{
+						"compute": privatev1.ClusterNodeSet_builder{
+							Size: 3,
+						}.Build(),
+						"gpu": privatev1.ClusterNodeSet_builder{
+							Size: 1,
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+			// Expected: compute updated, gpu preserved (overlay, not replace)
+			privatev1.Cluster_builder{
+				Id: "existing-id",
+				Spec: privatev1.ClusterSpec_builder{
+					Template: "my_template",
+					NodeSets: map[string]*privatev1.ClusterNodeSet{
+						"compute": privatev1.ClusterNodeSet_builder{
+							Size: 5,
+						}.Build(),
+						"gpu": privatev1.ClusterNodeSet_builder{
+							Size: 1,
+						}.Build(),
+					},
+				}.Build(),
+			}.Build(),
+		),
+	)
+
+	DescribeTable(
 		"Merge cluster private to public",
 		func(from *privatev1.Cluster, to *publicv1.Cluster, expected *publicv1.Cluster) {
 			mapper, err := NewGenericMapper[*privatev1.Cluster, *publicv1.Cluster]().
