@@ -67,6 +67,18 @@ type catalogItem interface {
 	GetMetadata() *privatev1.Metadata
 }
 
+// validateFieldDefinitions checks that field definitions are well-formed. Non-editable fields must have a default
+// value, otherwise provisioning from this catalog item will always fail.
+func validateFieldDefinitions(fieldDefinitions []*privatev1.FieldDefinition) error {
+	for _, fd := range fieldDefinitions {
+		if !fd.GetEditable() && !fd.HasDefault() {
+			return grpcstatus.Errorf(grpccodes.InvalidArgument,
+				"non-editable field '%s' must have a default value", fd.GetPath())
+		}
+	}
+	return nil
+}
+
 // applyFieldDefinitions validates and applies field definitions from a catalog item against a resource spec.
 // Rejects any spec field not listed in field_definitions (except system fields catalog_item, template and template_parameters).
 // For non-editable fields: rejects user-provided values; applies the catalog item default.
