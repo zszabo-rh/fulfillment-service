@@ -65,7 +65,7 @@ var _ = Describe("applyFieldDefinitions", func() {
 		Expect(spec.GetPullSecret()).To(Equal("default-secret"))
 	})
 
-	It("overrides user value with default for non-editable field", func() {
+	It("rejects user value for non-editable field", func() {
 		userValue := "user-value"
 		spec := &privatev1.ClusterSpec{
 			PullSecret: &userValue,
@@ -78,8 +78,40 @@ var _ = Describe("applyFieldDefinitions", func() {
 			Default:  defaultVal,
 		}}
 		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).To(HaveOccurred())
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		Expect(err.Error()).To(ContainSubstring("not editable"))
+	})
+
+	It("applies default for non-editable field when user provides no value", func() {
+		spec := &privatev1.ClusterSpec{}
+		defaultVal, err := structpb.NewValue("admin-value")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "pull_secret",
+			Editable: false,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(spec.GetPullSecret()).To(Equal("admin-value"))
+	})
+
+	It("happy path: editable value preserved and non-editable default applied", func() {
+		sshKey := "ssh-ed25519 USER_KEY"
+		spec := &privatev1.ClusterSpec{
+			SshPublicKey: &sshKey,
+		}
+		defaultRelease, err := structpb.NewValue("quay.io/ocp:4.16")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{
+			{Path: "ssh_public_key", Editable: true},
+			{Path: "release_image", Editable: false, Default: defaultRelease},
+		}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(spec.GetSshPublicKey()).To(Equal("ssh-ed25519 USER_KEY"))
+		Expect(spec.GetReleaseImage()).To(Equal("quay.io/ocp:4.16"))
 	})
 
 	It("returns no error for empty field definitions", func() {
@@ -250,6 +282,25 @@ var _ = Describe("applyFieldDefinitions rejects unlisted fields", func() {
 		}}
 		err := applyFieldDefinitions(spec, fieldDefs)
 		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("rejects unlisted field before checking non-editable override", func() {
+		pullSecret := "user-override"
+		spec := &privatev1.ClusterSpec{
+			PullSecret: &pullSecret,
+		}
+		defaultVal, err := structpb.NewValue("admin-value")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "release_image",
+			Editable: false,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).To(HaveOccurred())
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		Expect(err.Error()).To(ContainSubstring("not allowed"))
+		Expect(err.Error()).To(ContainSubstring("pull_secret"))
 	})
 
 	It("rejects unlisted field on ComputeInstanceSpec", func() {

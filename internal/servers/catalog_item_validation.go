@@ -67,8 +67,9 @@ type catalogItem interface {
 	GetMetadata() *privatev1.Metadata
 }
 
-// applyFieldDefinitions processes field definitions from a catalog item against a resource spec.
-// For non-editable fields: overrides user-provided values with the catalog item default.
+// applyFieldDefinitions validates and applies field definitions from a catalog item against a resource spec.
+// Rejects any spec field not listed in field_definitions (except system fields catalog_item and template).
+// For non-editable fields: rejects user-provided values; applies the catalog item default.
 // For editable fields with user values: validates against the JSON Schema.
 // For editable fields without user values: applies the catalog item default.
 func applyFieldDefinitions(
@@ -126,6 +127,10 @@ func applyFieldDefinitions(
 			if defaultVal == nil {
 				return grpcstatus.Errorf(grpccodes.Internal,
 					"catalog item misconfigured: non-editable field '%s' has no default value", path)
+			}
+			if userHasValue && userVal != nil {
+				return grpcstatus.Errorf(grpccodes.InvalidArgument,
+					"field '%s' is not editable", path)
 			}
 			if err := applyDefault(specMap, path, defaultVal); err != nil {
 				return err
