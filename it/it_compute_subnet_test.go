@@ -69,6 +69,7 @@ var _ = Describe("ComputeInstance with Subnet attachment", func() {
 			Object: privatev1.NetworkClass_builder{
 				Title:                  "Test CUDN Network Class",
 				ImplementationStrategy: "cudn",
+				FabricManager:          "netris",
 			}.Build(),
 		}.Build())
 		Expect(err).ToNot(HaveOccurred())
