@@ -158,13 +158,19 @@ func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, proje
 		slog.String("project_path", projectPath),
 	)
 
-	// Make sure the project path starts with a slash:
-	if !strings.HasPrefix(projectPath, "/") {
+	// Make sure the project path starts with a slash (unless it's empty for tenant-level groups):
+	if projectPath != "" && !strings.HasPrefix(projectPath, "/") {
 		projectPath = fmt.Sprintf("/%s", projectPath)
 	}
 
 	// Create the viewers group:
-	viewersGroupPath := fmt.Sprintf("%s/%s", projectPath, GroupNameViewers)
+	var viewersGroupPath string
+	if projectPath == "" {
+		// Tenant-level project (empty name) - create group at root level
+		viewersGroupPath = fmt.Sprintf("/%s", GroupNameViewers)
+	} else {
+		viewersGroupPath = fmt.Sprintf("%s/%s", projectPath, GroupNameViewers)
+	}
 	viewersGroupID, err := m.client.CreateAuthorizationGroup(ctx, tenant, viewersGroupPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create viewers group: %w", err)
@@ -179,7 +185,13 @@ func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, proje
 	)
 
 	// Create the managers group:
-	managersGroupPath := fmt.Sprintf("%s/%s", projectPath, GroupNameManagers)
+	var managersGroupPath string
+	if projectPath == "" {
+		// Tenant-level project (empty name) - create group at root level
+		managersGroupPath = fmt.Sprintf("/%s", GroupNameManagers)
+	} else {
+		managersGroupPath = fmt.Sprintf("%s/%s", projectPath, GroupNameManagers)
+	}
 	managersGroupID, err := m.client.CreateAuthorizationGroup(ctx, tenant, managersGroupPath)
 	if err != nil {
 		// Clean up viewers group on failure

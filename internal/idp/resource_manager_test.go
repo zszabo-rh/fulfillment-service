@@ -197,6 +197,36 @@ var _ = Describe("ResourceManager", func() {
 			Expect(err.Error()).To(ContainSubstring("project path cannot contain '..' sequence"))
 			Expect(managersID).To(BeEmpty())
 		})
+
+		It("should handle empty project path for tenant-level groups", func() {
+			// When project path is empty, groups should be created at root level
+			// without double slashes (was "//system:viewers", should be "/system:viewers")
+			mockClient.EXPECT().
+				CreateAuthorizationGroup(gomock.Any(), "test-org", "/system:viewers").
+				Return("viewers-group-id", nil)
+
+			mockClient.EXPECT().
+				CreateAuthorizationGroup(gomock.Any(), "test-org", "/system:managers").
+				Return("managers-group-id", nil)
+
+			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(managersID).To(Equal("managers-group-id"))
+		})
+
+		It("should add leading slash to project path if missing", func() {
+			mockClient.EXPECT().
+				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
+				Return("viewers-group-id", nil)
+
+			mockClient.EXPECT().
+				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:managers").
+				Return("managers-group-id", nil)
+
+			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "test-project")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(managersID).To(Equal("managers-group-id"))
+		})
 	})
 
 	Describe("AddUserToProjectGroup", func() {

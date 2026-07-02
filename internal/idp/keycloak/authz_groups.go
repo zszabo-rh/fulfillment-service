@@ -62,10 +62,13 @@ func (c *Client) CreateAuthorizationGroup(ctx context.Context, tenantName, group
 		return "", fmt.Errorf("failed to ensure group hierarchy: %w", err)
 	}
 
-	// Get the created group ID from the cache
-	groupID, ok := cache[groupPath]
+	// Get the created group ID from the cache using the normalized path
+	// Normalize the path the same way ensureGroupHierarchyWithCache does
+	normalizedPath := "/" + strings.Trim(groupPath, "/")
+	normalizedPath = strings.ReplaceAll(normalizedPath, "//", "/")
+	groupID, ok := cache[normalizedPath]
 	if !ok {
-		return "", fmt.Errorf("group was created but ID not found in cache: %s", groupPath)
+		return "", fmt.Errorf("group was created but ID not found in cache: %s (normalized: %s)", groupPath, normalizedPath)
 	}
 
 	c.logger.DebugContext(ctx, "Created tenant authorization group",
@@ -114,10 +117,16 @@ func (c *Client) DeleteAuthorizationGroup(ctx context.Context, tenantName, group
 // Helper methods
 
 func (c *Client) ensureGroupHierarchyWithCache(ctx context.Context, orgID, groupPath string, cache map[string]string) error {
-	// Split path into segments (removing leading slash)
-	// "/web-app/system:viewers" -> ["web-app", "system:viewers"]
-	segments := strings.Split(strings.Trim(groupPath, "/"), "/")
-	if len(segments) == 0 {
+	// Normalize the path: remove leading/trailing slashes and collapse multiple slashes
+	// "//system:viewers" -> "system:viewers"
+	// "/web-app/system:viewers" -> "web-app/system:viewers"
+	normalizedPath := strings.Trim(groupPath, "/")
+	normalizedPath = strings.ReplaceAll(normalizedPath, "//", "/")
+
+	// Split path into segments
+	// "web-app/system:viewers" -> ["web-app", "system:viewers"]
+	segments := strings.Split(normalizedPath, "/")
+	if len(segments) == 0 || (len(segments) == 1 && segments[0] == "") {
 		return fmt.Errorf("invalid group path: %s", groupPath)
 	}
 
