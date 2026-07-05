@@ -316,6 +316,57 @@ var _ = Describe("Identity provider lifecycle", func() {
 		}
 	})
 
+	It("Handles early delete before reconciliation completes", func() {
+		idpName := fmt.Sprintf("early-del-%s", uuid.New())
+		expectedAlias := fmt.Sprintf("%s-%s", tenantName, idpName)
+
+		createResponse, err := client.Create(ctx, privatev1.IdentityProvidersCreateRequest_builder{
+			Object: privatev1.IdentityProvider_builder{
+				Metadata: privatev1.Metadata_builder{
+					Name:   idpName,
+					Tenant: tenantName,
+				}.Build(),
+				Spec: privatev1.IdentityProviderSpec_builder{
+					Title:   "Early Delete Test",
+					Enabled: true,
+					Oidc: privatev1.OidcConfig_builder{
+						AuthorizationUrl: "https://oidc.example.com/authorize",
+						TokenUrl:         "https://oidc.example.com/token",
+						ClientId:         "test-client",
+						ClientSecret:     "test-secret",
+						Issuer:           "https://oidc.example.com",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		idpID := createResponse.GetObject().GetId()
+
+		_, err = client.Delete(ctx, privatev1.IdentityProvidersDeleteRequest_builder{
+			Id: idpID,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(
+			func(g Gomega) {
+				_, err := client.Get(ctx, privatev1.IdentityProvidersGetRequest_builder{
+					Id: idpID,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			},
+			2*time.Minute,
+			time.Second,
+		).Should(Succeed())
+
+		code, _, err := tool.KeycloakAdminRequest(ctx, http.MethodGet,
+			fmt.Sprintf("/identity-provider/instances/%s", expectedAlias), nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(code).To(Equal(http.StatusNotFound))
+	})
+
 	It("Rejects identity provider creation with invalid tenants", func() {
 		invalidTenants := []string{"shared", "system", ""}
 
@@ -346,6 +397,95 @@ var _ = Describe("Identity provider lifecycle", func() {
 			Expect(ok).To(BeTrue())
 			Expect(status.Code()).To(Equal(grpccodes.InvalidArgument),
 				"Expected InvalidArgument for tenant %q, got %v", invalidTenant, status.Code())
+		}
+	})
+
+	It("Handles concurrent IdP creation across multiple tenants", func() {
+		tenantBName := fmt.Sprintf("idp-conc-b-%s", uuid.New())
+		createTenantBResp, err := tenantsClient.Create(ctx, privatev1.TenantsCreateRequest_builder{
+			Object: privatev1.Tenant_builder{
+				Metadata: privatev1.Metadata_builder{
+					Name: tenantBName,
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		tenantBID := createTenantBResp.GetObject().GetId()
+		DeferCleanup(func() {
+			_, _ = tenantsClient.Delete(ctx, privatev1.TenantsDeleteRequest_builder{
+				Id: tenantBID,
+			}.Build())
+		})
+		waitForTenantSynced(ctx, tenantsClient, tenantBID)
+
+		type idpEntry struct {
+			id    string
+			alias string
+		}
+		idps := make([]idpEntry, 3)
+
+		names := []string{
+			fmt.Sprintf("conc-a1-%s", uuid.New()),
+			fmt.Sprintf("conc-a2-%s", uuid.New()),
+			fmt.Sprintf("conc-b1-%s", uuid.New()),
+		}
+		tenants := []string{tenantName, tenantName, tenantBName}
+
+		for i := range 3 {
+			resp, err := client.Create(ctx, privatev1.IdentityProvidersCreateRequest_builder{
+				Object: privatev1.IdentityProvider_builder{
+					Metadata: privatev1.Metadata_builder{
+						Name:   names[i],
+						Tenant: tenants[i],
+					}.Build(),
+					Spec: privatev1.IdentityProviderSpec_builder{
+						Title:   fmt.Sprintf("Concurrent Test %d", i+1),
+						Enabled: true,
+						Oidc: privatev1.OidcConfig_builder{
+							AuthorizationUrl: "https://oidc.example.com/authorize",
+							TokenUrl:         "https://oidc.example.com/token",
+							ClientId:         fmt.Sprintf("client-%d", i),
+							ClientSecret:     "test-secret",
+							Issuer:           "https://oidc.example.com",
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			idps[i] = idpEntry{
+				id:    resp.GetObject().GetId(),
+				alias: fmt.Sprintf("%s-%s", tenants[i], names[i]),
+			}
+			DeferCleanup(func() {
+				_, _ = client.Delete(ctx, privatev1.IdentityProvidersDeleteRequest_builder{
+					Id: idps[i].id,
+				}.Build())
+			})
+		}
+
+		for _, entry := range idps {
+			entry := entry
+			Eventually(
+				func(g Gomega) {
+					getResponse, err := client.Get(ctx, privatev1.IdentityProvidersGetRequest_builder{
+						Id: entry.id,
+					}.Build())
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(getResponse.GetObject().GetStatus().GetPhase()).To(
+						Equal(privatev1.IdentityProviderPhase_IDENTITY_PROVIDER_PHASE_READY),
+					)
+				},
+				2*time.Minute,
+				time.Second,
+			).Should(Succeed())
+		}
+
+		for _, entry := range idps {
+			code, _, err := tool.KeycloakAdminRequest(ctx, http.MethodGet,
+				fmt.Sprintf("/identity-provider/instances/%s", entry.alias), nil)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(code).To(Equal(http.StatusOK),
+				"IdP with alias %q should exist in Keycloak", entry.alias)
 		}
 	})
 })
