@@ -182,4 +182,76 @@ var _ = Describe("Identity provider lifecycle", func() {
 		Expect(err).ToNot(HaveOccurred())
 		Expect(code).To(Equal(http.StatusNotFound))
 	})
+
+	It("Enforces tenant isolation between identity providers", func() {
+		tenantBName := fmt.Sprintf("idp-iso-b-%s", uuid.New())
+		createTenantBResp, err := tenantsClient.Create(ctx, privatev1.TenantsCreateRequest_builder{
+			Object: privatev1.Tenant_builder{
+				Metadata: privatev1.Metadata_builder{
+					Name: tenantBName,
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		tenantBID := createTenantBResp.GetObject().GetId()
+		DeferCleanup(func() {
+			_, _ = tenantsClient.Delete(ctx, privatev1.TenantsDeleteRequest_builder{
+				Id: tenantBID,
+			}.Build())
+		})
+		waitForTenantSynced(ctx, tenantsClient, tenantBID)
+
+		idpName := fmt.Sprintf("iso-idp-%s", uuid.New())
+		createResponse, err := client.Create(ctx, privatev1.IdentityProvidersCreateRequest_builder{
+			Object: privatev1.IdentityProvider_builder{
+				Metadata: privatev1.Metadata_builder{
+					Name:   idpName,
+					Tenant: tenantName,
+				}.Build(),
+				Spec: privatev1.IdentityProviderSpec_builder{
+					Title:   "Isolation Test Provider",
+					Enabled: true,
+					Oidc: privatev1.OidcConfig_builder{
+						AuthorizationUrl: "https://oidc.example.com/authorize",
+						TokenUrl:         "https://oidc.example.com/token",
+						ClientId:         "test-client",
+						ClientSecret:     "test-secret",
+						Issuer:           "https://oidc.example.com",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		idpID := createResponse.GetObject().GetId()
+		DeferCleanup(func() {
+			_, _ = client.Delete(ctx, privatev1.IdentityProvidersDeleteRequest_builder{
+				Id: idpID,
+			}.Build())
+		})
+
+		filterTenantA := fmt.Sprintf("this.metadata.tenant == %q", tenantName)
+		listResponseA, err := client.List(ctx, privatev1.IdentityProvidersListRequest_builder{
+			Filter: &filterTenantA,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(listResponseA.GetTotal()).To(BeNumerically(">=", 1))
+		found := false
+		for _, item := range listResponseA.GetItems() {
+			if item.GetId() == idpID {
+				found = true
+				break
+			}
+		}
+		Expect(found).To(BeTrue(), "IdP should be visible when filtering by its own tenant")
+
+		filterTenantB := fmt.Sprintf("this.metadata.tenant == %q", tenantBName)
+		listResponseB, err := client.List(ctx, privatev1.IdentityProvidersListRequest_builder{
+			Filter: &filterTenantB,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		for _, item := range listResponseB.GetItems() {
+			Expect(item.GetId()).ToNot(Equal(idpID),
+				"IdP should NOT be visible when filtering by a different tenant")
+		}
+	})
 })
