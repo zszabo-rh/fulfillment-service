@@ -315,4 +315,37 @@ var _ = Describe("Identity provider lifecycle", func() {
 				"IdP should NOT be visible when filtering by a different tenant")
 		}
 	})
+
+	It("Rejects identity provider creation with invalid tenants", func() {
+		invalidTenants := []string{"shared", "system", ""}
+
+		for _, invalidTenant := range invalidTenants {
+			idpName := fmt.Sprintf("invalid-tenant-%s", uuid.New())
+			_, err := client.Create(ctx, privatev1.IdentityProvidersCreateRequest_builder{
+				Object: privatev1.IdentityProvider_builder{
+					Metadata: privatev1.Metadata_builder{
+						Name:   idpName,
+						Tenant: invalidTenant,
+					}.Build(),
+					Spec: privatev1.IdentityProviderSpec_builder{
+						Title:   "Invalid Tenant Test",
+						Enabled: true,
+						Oidc: privatev1.OidcConfig_builder{
+							AuthorizationUrl: "https://oidc.example.com/authorize",
+							TokenUrl:         "https://oidc.example.com/token",
+							ClientId:         "test-client",
+							ClientSecret:     "test-secret",
+							Issuer:           "https://oidc.example.com",
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build())
+			Expect(err).To(HaveOccurred(),
+				"Creating IdP with tenant %q should fail", invalidTenant)
+			status, ok := grpcstatus.FromError(err)
+			Expect(ok).To(BeTrue())
+			Expect(status.Code()).To(Equal(grpccodes.InvalidArgument),
+				"Expected InvalidArgument for tenant %q, got %v", invalidTenant, status.Code())
+		}
+	})
 })
