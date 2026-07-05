@@ -34,6 +34,8 @@ import (
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/clustercatalogitem"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/computeinstance"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/computeinstancecatalogitem"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/externalip"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/externalipattachment"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/hub"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/instancetype"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/publicip"
@@ -62,6 +64,8 @@ func Cmd() *cobra.Command {
 	result.AddCommand(clustercatalogitem.Cmd())
 	result.AddCommand(computeinstance.Cmd())
 	result.AddCommand(computeinstancecatalogitem.Cmd())
+	result.AddCommand(externalip.Cmd())
+	result.AddCommand(externalipattachment.Cmd())
 	result.AddCommand(hub.Cmd())
 	result.AddCommand(instancetype.Cmd())
 	result.AddCommand(publicip.Cmd())
