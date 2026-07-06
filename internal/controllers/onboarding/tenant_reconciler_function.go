@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clnt "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	osacv1alpha1 "github.com/osac-project/osac-operator/api/v1alpha1"
 
@@ -161,38 +162,28 @@ func (t *task) update(ctx context.Context) error {
 }
 
 func (t *task) createOrUpdateOnHub(ctx context.Context, hubId string, hubEntry *controllers.HubEntry) error {
-	existing, err := t.getKubeObject(ctx, hubEntry)
-	if err != nil {
-		return err
-	}
-
 	tenantName := t.tenant.GetMetadata().GetName()
-	if existing == nil {
-		object := &osacv1alpha1.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: hubEntry.Namespace,
-				Name:      tenantName,
-				Labels: map[string]string{
-					labels.TenantUuid: tenantName,
-				},
-			},
-		}
-		err = hubEntry.Client.Create(ctx, object)
-		if err != nil {
-			return fmt.Errorf("failed to create tenant on hub %s: %w", hubId, err)
-		}
-		t.r.logger.DebugContext(ctx, "Created tenant",
-			slog.String("hub_id", hubId),
-			slog.String("namespace", object.GetNamespace()),
-			slog.String("name", object.GetName()),
-		)
-	} else {
-		t.r.logger.DebugContext(ctx, "Tenant already exists on hub",
-			slog.String("hub_id", hubId),
-			slog.String("namespace", existing.GetNamespace()),
-			slog.String("name", existing.GetName()),
-		)
+	object := &osacv1alpha1.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: hubEntry.Namespace,
+			Name:      tenantName,
+		},
 	}
+	result, err := controllerutil.CreateOrPatch(ctx, hubEntry.Client, object, func() error {
+		if object.Labels == nil {
+			object.Labels = make(map[string]string)
+		}
+		object.Labels[labels.TenantUuid] = tenantName
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create or patch tenant on hub %s: %w", hubId, err)
+	}
+	t.r.logger.DebugContext(ctx, fmt.Sprintf("%s tenant", result),
+		slog.String("hub_id", hubId),
+		slog.String("namespace", object.GetNamespace()),
+		slog.String("name", object.GetName()),
+	)
 
 	if err := t.ensureNamespaceOnHub(ctx, hubId, hubEntry); err != nil {
 		return err
@@ -203,33 +194,23 @@ func (t *task) createOrUpdateOnHub(ctx context.Context, hubId string, hubEntry *
 
 func (t *task) ensureNamespaceOnHub(ctx context.Context, hubId string, hubEntry *controllers.HubEntry) error {
 	tenantName := t.tenant.GetMetadata().GetName()
-	ns := &corev1.Namespace{}
-	err := hubEntry.Client.Get(ctx, clnt.ObjectKey{Name: tenantName}, ns)
-	if err == nil {
-		t.r.logger.DebugContext(ctx, "Tenant namespace already exists on hub",
-			slog.String("hub_id", hubId),
-			slog.String("name", tenantName),
-		)
-		return nil
-	}
-	if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to get namespace on hub %s: %w", hubId, err)
-	}
-
-	ns = &corev1.Namespace{
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tenantName,
-			Labels: map[string]string{
-				labels.TenantRef: tenantName,
-				labels.Project:   hubEntry.Namespace,
-			},
 		},
 	}
-	err = hubEntry.Client.Create(ctx, ns)
+	result, err := controllerutil.CreateOrPatch(ctx, hubEntry.Client, ns, func() error {
+		if ns.Labels == nil {
+			ns.Labels = make(map[string]string)
+		}
+		ns.Labels[labels.TenantRef] = tenantName
+		ns.Labels[labels.Project] = hubEntry.Namespace
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("failed to create namespace on hub %s: %w", hubId, err)
+		return fmt.Errorf("failed to create or patch namespace on hub %s: %w", hubId, err)
 	}
-	t.r.logger.DebugContext(ctx, "Created tenant namespace",
+	t.r.logger.DebugContext(ctx, fmt.Sprintf("%s tenant namespace", result),
 		slog.String("hub_id", hubId),
 		slog.String("name", tenantName),
 	)
