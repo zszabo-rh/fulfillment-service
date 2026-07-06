@@ -632,7 +632,7 @@ var _ = Describe("run", func() {
 		})
 
 		When("creating a Tenant CRD on a hub fails", func() {
-			It("returns the error", func() {
+			It("sets status to FAILED with error message", func() {
 				expectedErr := errors.New("create failed")
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -657,6 +657,12 @@ var _ = Describe("run", func() {
 					Get(gomock.Any(), hub1ID).
 					Return(&controllers.HubEntry{Namespace: namespace1, Client: fakeClient}, nil)
 
+				mockTenants.EXPECT().
+					Update(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, req *privatev1.TenantsUpdateRequest, opts ...grpc.CallOption) (*privatev1.TenantsUpdateResponse, error) {
+						return &privatev1.TenantsUpdateResponse{Object: req.GetObject()}, nil
+					})
+
 				tenant := privatev1.Tenant_builder{
 					Id: tenantID,
 					Metadata: privatev1.Metadata_builder{
@@ -669,7 +675,16 @@ var _ = Describe("run", func() {
 				f := newFunction(mockHubCache, mockHubs, mockTenants, mockProjects)
 				err := f.run(ctx, tenant)
 
-				Expect(err).To(MatchError(ContainSubstring("create failed")))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(tenant.GetStatus().GetState()).To(
+					Equal(privatev1.TenantState_TENANT_STATE_FAILED),
+				)
+				Expect(tenant.GetStatus().GetMessage()).To(
+					ContainSubstring(hub1ID),
+				)
+				Expect(tenant.GetStatus().GetMessage()).ToNot(
+					ContainSubstring("create failed"),
+				)
 			})
 		})
 	})

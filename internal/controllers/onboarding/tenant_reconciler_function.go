@@ -154,7 +154,15 @@ func (t *task) update(ctx context.Context) error {
 		}
 
 		if err := t.createOrUpdateOnHub(ctx, hub.GetId(), hubEntry); err != nil {
-			return err
+			t.r.logger.ErrorContext(ctx, "Failed to sync tenant to hub",
+				slog.String("hub_id", hub.GetId()),
+				slog.String("tenant_id", t.tenant.GetId()),
+				slog.String("error", err.Error()),
+			)
+			t.setFailed(fmt.Sprintf(
+				"Failed to sync tenant to hub '%s'", hub.GetId(),
+			))
+			return nil
 		}
 	}
 
@@ -377,4 +385,12 @@ func (t *task) removeFinalizer() {
 		})
 		t.tenant.GetMetadata().SetFinalizers(list)
 	}
+}
+
+func (t *task) setFailed(message string) {
+	if !t.tenant.HasStatus() {
+		t.tenant.SetStatus(&privatev1.TenantStatus{})
+	}
+	t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_FAILED)
+	t.tenant.GetStatus().SetMessage(message)
 }
