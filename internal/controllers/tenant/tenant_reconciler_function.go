@@ -164,6 +164,12 @@ func (t *task) update(ctx context.Context) error {
 
 // syncToIDP synchronizes the tenant to the identity provider.
 func (t *task) syncToIDP(ctx context.Context) error {
+	if t.tenant.GetStatus().GetIdpTenantName() != "" {
+		t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_SYNCED)
+		t.tenant.GetStatus().ClearMessage()
+		return nil
+	}
+
 	t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_PENDING)
 
 	tenantName := t.tenant.GetMetadata().GetName()
