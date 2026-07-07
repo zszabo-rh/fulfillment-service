@@ -419,6 +419,36 @@ var _ = Describe("IDP Sync", func() {
 		Expect(tenant.GetStatus().GetState()).To(Equal(privatev1.TenantState_TENANT_STATE_SYNCED))
 	})
 
+	It("should restore SYNCED without re-creating when IDP tenant already exists", func() {
+		tenant := privatev1.Tenant_builder{
+			Id: "org-123",
+			Metadata: privatev1.Metadata_builder{
+				Name:       "test-org",
+				Finalizers: []string{finalizers.Controller},
+				Tenant:     "tenant-1",
+			}.Build(),
+			Status: privatev1.TenantStatus_builder{
+				State:            privatev1.TenantState_TENANT_STATE_PENDING,
+				IdpTenantName:    "test-org",
+				BreakGlassUserId: "user-123",
+				Message:          new("previous hub sync failure"),
+			}.Build(),
+		}.Build()
+
+		task := &task{
+			r:      reconciler,
+			tenant: tenant,
+		}
+
+		err := task.update(ctx)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(tenant.GetStatus().GetState()).To(Equal(privatev1.TenantState_TENANT_STATE_SYNCED))
+		Expect(tenant.GetStatus().HasMessage()).To(BeFalse())
+		Expect(tenant.GetStatus().GetIdpTenantName()).To(Equal("test-org"))
+		Expect(tenant.GetStatus().GetBreakGlassUserId()).To(Equal("user-123"))
+	})
+
 	It("should pass domains to IDP during initial sync", func() {
 		tenant := privatev1.Tenant_builder{
 			Id: "org-domains",
