@@ -196,6 +196,17 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		Expect(image.GetSourceType()).To(Equal("registry"))
 		Expect(image.GetSourceRef()).To(Equal("quay.io/test/rhel9:latest"))
 
+		// Wait for the controller to reconcile (state moves from UNSPECIFIED)
+		Eventually(func(g Gomega) {
+			resp, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			g.Expect(err).ToNot(HaveOccurred())
+			g.Expect(resp.GetObject().GetStatus().GetState()).ToNot(
+				Equal(privatev1.BareMetalInstanceState_BARE_METAL_INSTANCE_STATE_UNSPECIFIED),
+				"controller should reconcile the BMI and set state")
+		}, time.Minute, time.Second).Should(Succeed())
+
 		// Verify the controller creates a BMFO BareMetalInstance CR on the cluster
 		kubeClient := tool.KubeClient()
 		bmiList := &bmfov1alpha1.BareMetalInstanceList{}
