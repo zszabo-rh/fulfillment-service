@@ -242,16 +242,17 @@ func (t *task) validateTenant() error {
 }
 
 func (t *task) delete(ctx context.Context) (err error) {
-	t.bareMetalInstance.GetStatus().SetState(privatev1.BareMetalInstanceState_BARE_METAL_INSTANCE_STATE_DELETING)
-	t.updateCondition(
-		privatev1.BareMetalInstanceConditionType_BARE_METAL_INSTANCE_CONDITION_TYPE_READY,
-		privatev1.ConditionStatus_CONDITION_STATUS_FALSE, "", "")
-
+	// Do nothing if we don't know the hub yet:
 	t.hubId = t.bareMetalInstance.GetStatus().GetHub()
 	if t.hubId == "" {
 		t.removeFinalizer()
 		return nil
 	}
+
+	t.bareMetalInstance.GetStatus().SetState(privatev1.BareMetalInstanceState_BARE_METAL_INSTANCE_STATE_DELETING)
+	t.updateCondition(
+		privatev1.BareMetalInstanceConditionType_BARE_METAL_INSTANCE_CONDITION_TYPE_READY,
+		privatev1.ConditionStatus_CONDITION_STATUS_FALSE, "", "")
 	err = t.getHub(ctx)
 	if err != nil {
 		if errors.Is(err, controllers.ErrHubNotFound) {
