@@ -11,7 +11,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 language governing permissions and limitations under the License.
 */
 
-package keycloak
+package idp
 
 import (
 	"context"
@@ -268,7 +268,7 @@ type groupNode struct {
 // getGroupIDByPathWithOrgID returns the group ID for a path using orgID directly (not organization name).
 // This is used internally when we already have the orgID to avoid an extra lookup.
 func (c *Client) getGroupIDByPathWithOrgID(ctx context.Context, orgID, groupPath string) (result string, err error) {
-	// The Keycloak organization groups list API does not populate subgroups, sowe manually traverse the hierarchy by splitting the path and fetching each level.
+	// The Keycloak organization groups list API does not populate subgroups, so we manually traverse the hierarchy by splitting the path and fetching each level.
 
 	// Normalize and split the path: "/bens-project/system:managers" -> ["bens-project", "system:managers"]
 	normalizedPath := strings.Trim(groupPath, "/")
@@ -295,19 +295,6 @@ func (c *Client) getGroupIDByPathWithOrgID(ctx context.Context, orgID, groupPath
 	// The last segment's ID is the final group ID
 	result = currentParentID
 	return
-}
-
-// searchGroupRecursively searches for a group by path in the group hierarchy.
-func searchGroupRecursively(group groupNode, targetPath string) string {
-	if group.Path == targetPath {
-		return group.ID
-	}
-	for _, subGroup := range group.SubGroups {
-		if id := searchGroupRecursively(subGroup, targetPath); id != "" {
-			return id
-		}
-	}
-	return ""
 }
 
 // GetGroupIDByPath gets a Keycloak organization group ID by its path.
