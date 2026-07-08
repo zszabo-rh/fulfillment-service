@@ -1247,6 +1247,34 @@ func (c *runnerContext) run(cmd *cobra.Command, argv []string) error { //nolint:
 	}
 	privatev1.RegisterExternalIPAttachmentsServer(grpcServer, privateExternalIPAttachmentsServer)
 
+	// Create the NAT gateways server:
+	c.logger.InfoContext(ctx, "Creating NAT gateways server")
+	natGatewaysServer, err := servers.NewNATGatewaysServer().
+		SetLogger(c.logger).
+		SetNotifier(notifier).
+		SetAttributionLogic(publicAttributionLogic).
+		SetTenancyLogic(tenancyLogic).
+		SetMetricsRegisterer(metricsRegisterer).
+		Build()
+	if err != nil {
+		return fmt.Errorf("failed to create NAT gateways server: %w", err)
+	}
+	publicv1.RegisterNATGatewaysServer(grpcServer, natGatewaysServer)
+
+	// Create the private NAT gateways server:
+	c.logger.InfoContext(ctx, "Creating private NAT gateways server")
+	privateNATGatewaysServer, err := servers.NewPrivateNATGatewaysServer().
+		SetLogger(c.logger).
+		SetNotifier(notifier).
+		SetAttributionLogic(privateAttributionLogic).
+		SetTenancyLogic(tenancyLogic).
+		SetMetricsRegisterer(metricsRegisterer).
+		Build()
+	if err != nil {
+		return fmt.Errorf("failed to create private NAT gateways server: %w", err)
+	}
+	privatev1.RegisterNATGatewaysServer(grpcServer, privateNATGatewaysServer)
+
 	// Create the public tenants server:
 	c.logger.InfoContext(ctx, "Creating public tenants server")
 	publicTenantsServer, err := servers.NewTenantsServer().
