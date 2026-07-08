@@ -252,8 +252,7 @@ func (s *PrivateComputeInstancesServer) Create(ctx context.Context,
 		return
 	}
 
-	// Attach warnings to the response (deprecation notices for DEPRECATED instance types
-	// or legacy cores/memory_gib usage per D-08, D-13).
+	// Attach warnings to the response (deprecation notices for DEPRECATED instance types).
 	if len(warnings) > 0 {
 		response.SetWarnings(warnings)
 	}
@@ -417,19 +416,7 @@ func (s *PrivateComputeInstancesServer) validateInstanceType(
 	}
 
 	if instanceTypeName == "" {
-		// No instance_type provided. Check for legacy path (D-08).
-		if spec.HasCores() || spec.HasMemoryGib() {
-			warnings = append(warnings,
-				"Direct cores/memory_gib is deprecated, use instance_type instead. "+
-					"This path will be removed in a future release.")
-		}
 		return warnings, nil
-	}
-
-	// Instance type is provided. Check mutual exclusivity (D-09).
-	if spec.HasCores() || spec.HasMemoryGib() {
-		return nil, grpcstatus.Errorf(grpccodes.InvalidArgument,
-			"instance_type and cores/memory_gib are mutually exclusive")
 	}
 
 	// Look up the instance type and validate its state.
@@ -438,10 +425,6 @@ func (s *PrivateComputeInstancesServer) validateInstanceType(
 		return nil, err
 	}
 	warnings = append(warnings, stateWarnings...)
-
-	// CRITICAL: Do NOT set spec.cores, spec.memory_gib, or labels here.
-	// Per D-01, the API stores only the instance_type name. The reconciler
-	// expands cores/memory_gib and sets the label on the K8S CR (Plan 04).
 
 	return warnings, nil
 }

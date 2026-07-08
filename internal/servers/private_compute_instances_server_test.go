@@ -234,6 +234,29 @@ var _ = Describe("Private compute instances server", func() {
 				SetTenancyLogic(tenancy).
 				Build()
 			Expect(err).ToNot(HaveOccurred())
+
+			// Create a default InstanceType for tests that need it:
+			instanceTypesDao, err := dao.NewGenericDAO[*privatev1.InstanceType]().
+				SetLogger(logger).
+				SetTenancyLogic(tenancy).
+				Build()
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = instanceTypesDao.Create().SetObject(
+				privatev1.InstanceType_builder{
+					Id: "standard-4-16",
+					Metadata: privatev1.Metadata_builder{
+						Name:   "standard-4-16",
+						Tenant: auth.SharedTenant,
+					}.Build(),
+					Spec: privatev1.InstanceTypeSpec_builder{
+						Cores:     4,
+						MemoryGib: 16,
+						State:     privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_ACTIVE,
+					}.Build(),
+				}.Build(),
+			).Do(ctx)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		// Helper function to create a template
@@ -277,8 +300,7 @@ var _ = Describe("Private compute instances server", func() {
 					},
 				},
 				SpecDefaults: privatev1.ComputeInstanceTemplateSpecDefaults_builder{
-					Cores:     new(int32(2)),
-					MemoryGib: new(int32(2)),
+					InstanceType: new("standard-4-16"),
 					Image: privatev1.ComputeInstanceImage_builder{
 						SourceType: "registry",
 						SourceRef:  "quay.io/containerdisks/fedora:latest",
@@ -793,8 +815,7 @@ var _ = Describe("Private compute instances server", func() {
 
 			spec := response.GetObject().GetSpec()
 			// Template defaults should be stored:
-			Expect(spec.GetCores()).To(Equal(int32(2)))
-			Expect(spec.GetMemoryGib()).To(Equal(int32(2)))
+			Expect(spec.GetInstanceType()).To(Equal("standard-4-16"))
 			Expect(spec.GetRunStrategy()).To(Equal("Always"))
 			Expect(spec.GetImage().GetSourceType()).To(Equal("registry"))
 			Expect(spec.GetImage().GetSourceRef()).To(Equal("quay.io/containerdisks/fedora:latest"))
@@ -806,13 +827,11 @@ var _ = Describe("Private compute instances server", func() {
 		It("User-provided spec fields override template defaults", func() {
 			createTemplate("override-template")
 
-			// Create with user-provided cores and memory:
+			// Create with user-provided run_strategy (overrides template default):
 			response, err := server.Create(ctx, privatev1.ComputeInstancesCreateRequest_builder{
 				Object: privatev1.ComputeInstance_builder{
 					Spec: privatev1.ComputeInstanceSpec_builder{
 						Template:    "override-template",
-						Cores:       new(int32(8)),
-						MemoryGib:   new(int32(16)),
 						RunStrategy: new("Halted"),
 						NetworkAttachments: []*privatev1.NetworkAttachment{
 							privatev1.NetworkAttachment_builder{
@@ -827,10 +846,9 @@ var _ = Describe("Private compute instances server", func() {
 
 			spec := response.GetObject().GetSpec()
 			// User-provided values should be stored:
-			Expect(spec.GetCores()).To(Equal(int32(8)))
-			Expect(spec.GetMemoryGib()).To(Equal(int32(16)))
 			Expect(spec.GetRunStrategy()).To(Equal("Halted"))
 			// Template defaults should be stored:
+			Expect(spec.GetInstanceType()).To(Equal("standard-4-16"))
 			Expect(spec.GetImage().GetSourceType()).To(Equal("registry"))
 			Expect(spec.GetImage().GetSourceRef()).To(Equal("quay.io/containerdisks/fedora:latest"))
 			Expect(spec.GetBootDisk().GetSizeGib()).To(Equal(int32(10)))
@@ -875,9 +893,8 @@ var _ = Describe("Private compute instances server", func() {
 			Expect(ok).To(BeTrue())
 			Expect(status.Code()).To(Equal(grpccodes.InvalidArgument))
 			Expect(status.Message()).To(ContainSubstring("boot_disk"))
-			Expect(status.Message()).To(ContainSubstring("cores"))
 			Expect(status.Message()).To(ContainSubstring("image"))
-			Expect(status.Message()).To(ContainSubstring("memory_gib"))
+			Expect(status.Message()).To(ContainSubstring("instance_type"))
 			Expect(status.Message()).To(ContainSubstring("run_strategy"))
 		})
 
@@ -904,9 +921,8 @@ var _ = Describe("Private compute instances server", func() {
 			response, err := server.Create(ctx, privatev1.ComputeInstancesCreateRequest_builder{
 				Object: privatev1.ComputeInstance_builder{
 					Spec: privatev1.ComputeInstanceSpec_builder{
-						Template:  "bare-template",
-						Cores:     new(int32(4)),
-						MemoryGib: new(int32(8)),
+						Template:     "bare-template",
+						InstanceType: new("standard-4-16"),
 						Image: privatev1.ComputeInstanceImage_builder{
 							SourceType: "registry",
 							SourceRef:  "quay.io/containerdisks/fedora:latest",
@@ -925,7 +941,7 @@ var _ = Describe("Private compute instances server", func() {
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(response).ToNot(BeNil())
-			Expect(response.GetObject().GetSpec().GetCores()).To(Equal(int32(4)))
+			Expect(response.GetObject().GetSpec().GetInstanceType()).To(Equal("standard-4-16"))
 		})
 
 		It("Partial defaults plus partial user input satisfies validation", func() {
@@ -944,9 +960,8 @@ var _ = Describe("Private compute instances server", func() {
 					Tenant: auth.SharedTenant,
 				}.Build(),
 				SpecDefaults: privatev1.ComputeInstanceTemplateSpecDefaults_builder{
-					Cores:       new(int32(2)),
-					MemoryGib:   new(int32(4)),
-					RunStrategy: new("Always"),
+					InstanceType: new("standard-4-16"),
+					RunStrategy:  new("Always"),
 				}.Build(),
 			}.Build()
 			_, err = templatesDao.Create().SetObject(template).Do(ctx)
@@ -977,8 +992,7 @@ var _ = Describe("Private compute instances server", func() {
 
 			spec := response.GetObject().GetSpec()
 			// Template defaults should be stored:
-			Expect(spec.GetCores()).To(Equal(int32(2)))
-			Expect(spec.GetMemoryGib()).To(Equal(int32(4)))
+			Expect(spec.GetInstanceType()).To(Equal("standard-4-16"))
 			Expect(spec.GetRunStrategy()).To(Equal("Always"))
 			// User-provided fields should be stored:
 			Expect(spec.GetImage().GetSourceRef()).To(Equal("quay.io/containerdisks/fedora:latest"))
@@ -1322,30 +1336,8 @@ var _ = Describe("Private compute instances server", func() {
 			})
 
 			It("Creates compute instance when template spec_defaults has valid instance_type", func() {
-				// Create an instance type:
-				instanceTypesDao, err := dao.NewGenericDAO[*privatev1.InstanceType]().
-					SetLogger(logger).
-					SetTenancyLogic(tenancy).
-					Build()
-				Expect(err).ToNot(HaveOccurred())
-
-				_, err = instanceTypesDao.Create().SetObject(
-					privatev1.InstanceType_builder{
-						Id: "standard-4-16",
-						Metadata: privatev1.Metadata_builder{
-							Name:   "standard-4-16",
-							Tenant: auth.SharedTenant,
-						}.Build(),
-						Spec: privatev1.InstanceTypeSpec_builder{
-							Cores:     4,
-							MemoryGib: 16,
-							State:     privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_ACTIVE,
-						}.Build(),
-					}.Build(),
-				).Do(ctx)
-				Expect(err).ToNot(HaveOccurred())
-
-				// Create a template with instance_type in spec_defaults:
+				// Create a template with instance_type in spec_defaults
+				// (the "standard-4-16" instance type is already created by BeforeEach):
 				templatesDao, err := dao.NewGenericDAO[*privatev1.ComputeInstanceTemplate]().
 					SetLogger(logger).
 					SetTenancyLogic(tenancy).
@@ -1439,6 +1431,29 @@ var _ = Describe("Private compute instances server", func() {
 			memoryDefault, err := anypb.New(wrapperspb.Int32(2))
 			Expect(err).ToNot(HaveOccurred())
 
+			// Create an InstanceType for network validation tests:
+			instanceTypesDao, err := dao.NewGenericDAO[*privatev1.InstanceType]().
+				SetLogger(logger).
+				SetTenancyLogic(tenancy).
+				Build()
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = instanceTypesDao.Create().SetObject(
+				privatev1.InstanceType_builder{
+					Id: "standard-4-16",
+					Metadata: privatev1.Metadata_builder{
+						Name:   "standard-4-16",
+						Tenant: auth.SharedTenant,
+					}.Build(),
+					Spec: privatev1.InstanceTypeSpec_builder{
+						Cores:     4,
+						MemoryGib: 16,
+						State:     privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_ACTIVE,
+					}.Build(),
+				}.Build(),
+			).Do(ctx)
+			Expect(err).ToNot(HaveOccurred())
+
 			template = privatev1.ComputeInstanceTemplate_builder{
 				Id:          "test-template",
 				Title:       "Test Template",
@@ -1465,8 +1480,7 @@ var _ = Describe("Private compute instances server", func() {
 					},
 				},
 				SpecDefaults: privatev1.ComputeInstanceTemplateSpecDefaults_builder{
-					Cores:     new(int32(2)),
-					MemoryGib: new(int32(2)),
+					InstanceType: new("standard-4-16"),
 					Image: privatev1.ComputeInstanceImage_builder{
 						SourceType: "registry",
 						SourceRef:  "quay.io/containerdisks/fedora:latest",
@@ -2002,6 +2016,127 @@ var _ = Describe("Private compute instances server", func() {
 				Expect(ok).To(BeTrue())
 				Expect(status.Code()).To(Equal(grpccodes.InvalidArgument))
 				Expect(status.Message()).To(ContainSubstring("cannot change number"))
+			})
+		})
+
+		Context("instance_type validation", func() {
+			// Helper to create an InstanceType with a specific state via DAO.
+			createInstanceTypeWithState := func(name string, state privatev1.InstanceTypeState) {
+				instanceTypesDao, err := dao.NewGenericDAO[*privatev1.InstanceType]().
+					SetLogger(logger).
+					SetTenancyLogic(tenancy).
+					Build()
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = instanceTypesDao.Create().SetObject(
+					privatev1.InstanceType_builder{
+						Id: name,
+						Metadata: privatev1.Metadata_builder{
+							Name:   name,
+							Tenant: auth.SharedTenant,
+						}.Build(),
+						Spec: privatev1.InstanceTypeSpec_builder{
+							Cores:     4,
+							MemoryGib: 16,
+							State:     state,
+						}.Build(),
+					}.Build(),
+				).Do(ctx)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			// Helper to build a full ComputeInstance create request with all required fields.
+			createRequestWithInstanceType := func(instanceTypeName string) *privatev1.ComputeInstancesCreateRequest {
+				// Use a bare template without spec defaults so the instance_type
+				// on the spec is used directly.
+				templatesDao, err := dao.NewGenericDAO[*privatev1.ComputeInstanceTemplate]().
+					SetLogger(logger).
+					SetTenancyLogic(tenancy).
+					Build()
+				Expect(err).ToNot(HaveOccurred())
+
+				templateID := fmt.Sprintf("bare-template-%s", instanceTypeName)
+				_, err = templatesDao.Create().SetObject(
+					privatev1.ComputeInstanceTemplate_builder{
+						Id:          templateID,
+						Title:       "Bare Template",
+						Description: "Template without defaults",
+						Metadata: privatev1.Metadata_builder{
+							Tenant: auth.SharedTenant,
+						}.Build(),
+					}.Build(),
+				).Do(ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				return privatev1.ComputeInstancesCreateRequest_builder{
+					Object: privatev1.ComputeInstance_builder{
+						Spec: privatev1.ComputeInstanceSpec_builder{
+							Template:     templateID,
+							InstanceType: new(instanceTypeName),
+							Image: privatev1.ComputeInstanceImage_builder{
+								SourceType: "registry",
+								SourceRef:  "quay.io/containerdisks/fedora:latest",
+							}.Build(),
+							BootDisk: privatev1.ComputeInstanceDisk_builder{
+								SizeGib: 20,
+							}.Build(),
+							RunStrategy: new("Always"),
+							NetworkAttachments: []*privatev1.NetworkAttachment{
+								privatev1.NetworkAttachment_builder{
+									Subnet: "test-subnet",
+								}.Build(),
+							},
+						}.Build(),
+					}.Build(),
+				}.Build()
+			}
+
+			It("Rejects creation when instance_type references a non-existent instance type", func() {
+				request := createRequestWithInstanceType("nonexistent-type")
+				response, err := server.Create(ctx, request)
+				Expect(err).To(HaveOccurred())
+				Expect(response).To(BeNil())
+				status, ok := grpcstatus.FromError(err)
+				Expect(ok).To(BeTrue())
+				Expect(status.Code()).To(Equal(grpccodes.NotFound))
+				Expect(status.Message()).To(ContainSubstring("nonexistent-type"))
+			})
+
+			It("Rejects creation when instance_type references an OBSOLETE instance type", func() {
+				createInstanceTypeWithState("obsolete-type",
+					privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_OBSOLETE)
+
+				request := createRequestWithInstanceType("obsolete-type")
+				response, err := server.Create(ctx, request)
+				Expect(err).To(HaveOccurred())
+				Expect(response).To(BeNil())
+				status, ok := grpcstatus.FromError(err)
+				Expect(ok).To(BeTrue())
+				Expect(status.Code()).To(Equal(grpccodes.FailedPrecondition))
+				Expect(status.Message()).To(ContainSubstring("obsolete"))
+			})
+
+			It("Returns warning when instance_type references a DEPRECATED instance type", func() {
+				createInstanceTypeWithState("deprecated-type",
+					privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_DEPRECATED)
+
+				request := createRequestWithInstanceType("deprecated-type")
+				response, err := server.Create(ctx, request)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(response).ToNot(BeNil())
+				Expect(response.GetWarnings()).To(HaveLen(1))
+				Expect(response.GetWarnings()[0]).To(ContainSubstring("deprecated"))
+			})
+
+			It("Succeeds when instance_type references an ACTIVE instance type", func() {
+				createInstanceTypeWithState("active-type",
+					privatev1.InstanceTypeState_INSTANCE_TYPE_STATE_ACTIVE)
+
+				request := createRequestWithInstanceType("active-type")
+				response, err := server.Create(ctx, request)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(response).ToNot(BeNil())
+				Expect(response.GetWarnings()).To(BeEmpty())
 			})
 		})
 	})

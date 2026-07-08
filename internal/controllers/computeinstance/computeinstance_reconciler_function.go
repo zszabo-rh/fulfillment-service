@@ -632,27 +632,22 @@ func (t *task) buildSpecNetworkAttachments(ctx context.Context, spec *osacv1alph
 func (t *task) addExplicitFields(ctx context.Context, spec *osacv1alpha1.ComputeInstanceSpec) error {
 	ciSpec := t.computeInstance.GetSpec()
 
-	if instanceTypeName := ciSpec.GetInstanceType(); instanceTypeName != "" {
-		// Instance type path: resolve instance_type name to cores/memory_gib via gRPC lookup.
-		// Per D-05: do NOT check InstanceType state. The OBSOLETE check was done at API creation time.
-		response, err := t.r.instanceTypesClient.Get(ctx, privatev1.InstanceTypesGetRequest_builder{
-			Id: instanceTypeName,
-		}.Build())
-		if err != nil {
-			return fmt.Errorf("failed to resolve instance type '%s': %w", instanceTypeName, err)
-		}
-		itSpec := response.GetObject().GetSpec()
-		spec.Cores = itSpec.GetCores()
-		spec.MemoryGiB = itSpec.GetMemoryGib()
-	} else {
-		// Legacy path: use cores/memory_gib directly from the compute instance spec.
-		if ciSpec.HasCores() {
-			spec.Cores = ciSpec.GetCores()
-		}
-		if ciSpec.HasMemoryGib() {
-			spec.MemoryGiB = ciSpec.GetMemoryGib()
-		}
+	instanceTypeName := ciSpec.GetInstanceType()
+	if instanceTypeName == "" {
+		return fmt.Errorf(
+			"compute instance '%s' has no instance_type set; cannot resolve compute resources",
+			t.computeInstance.GetId(),
+		)
 	}
+	response, err := t.r.instanceTypesClient.Get(ctx, privatev1.InstanceTypesGetRequest_builder{
+		Id: instanceTypeName,
+	}.Build())
+	if err != nil {
+		return fmt.Errorf("failed to resolve instance type '%s': %w", instanceTypeName, err)
+	}
+	itSpec := response.GetObject().GetSpec()
+	spec.Cores = itSpec.GetCores()
+	spec.MemoryGiB = itSpec.GetMemoryGib()
 	if ciSpec.HasRunStrategy() {
 		spec.RunStrategy = osacv1alpha1.RunStrategyType(ciSpec.GetRunStrategy())
 	}

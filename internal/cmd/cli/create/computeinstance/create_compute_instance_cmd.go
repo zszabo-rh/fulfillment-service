@@ -90,18 +90,6 @@ func Cmd() *cobra.Command {
 		[]string{},
 		templateParameterFileFlagHelp,
 	)
-	flags.Int32Var(
-		&runner.args.cores,
-		"cores",
-		0,
-		coresFlagHelp,
-	)
-	flags.Int32Var(
-		&runner.args.memoryGiB,
-		"memory-gib",
-		0,
-		memoryFlagHelp,
-	)
 	flags.StringVar(
 		&runner.args.instanceType,
 		"instance-type",
@@ -165,8 +153,6 @@ func Cmd() *cobra.Command {
 
 	result.MarkFlagsMutuallyExclusive("catalog-item", "template")
 	result.MarkFlagsOneRequired("catalog-item", "template")
-	result.MarkFlagsMutuallyExclusive("instance-type", "cores")
-	result.MarkFlagsMutuallyExclusive("instance-type", "memory-gib")
 	return result
 }
 
@@ -177,8 +163,6 @@ type runnerContext struct {
 		catalogItem             string
 		templateParameterValues []string
 		templateParameterFiles  []string
-		cores                   int32
-		memoryGiB               int32
 		instanceType            string
 		imageSourceRef          string
 		imageSourceType         string
@@ -724,12 +708,6 @@ func (c *runnerContext) buildSpec(templateID string,
 			SourceRef:  c.args.imageSourceRef,
 		}.Build()
 	}
-	if c.args.cores > 0 {
-		spec.Cores = new(c.args.cores)
-	}
-	if c.args.memoryGiB > 0 {
-		spec.MemoryGib = new(c.args.memoryGiB)
-	}
 	if c.args.instanceType != "" {
 		spec.InstanceType = new(c.args.instanceType)
 	}
@@ -876,12 +854,6 @@ func (c *runnerContext) buildSpecFromCatalogItem(catalogItemID string) (*publicv
 			SourceRef:  c.args.imageSourceRef,
 		}.Build()
 	}
-	if c.args.cores > 0 {
-		spec.Cores = new(c.args.cores)
-	}
-	if c.args.memoryGiB > 0 {
-		spec.MemoryGib = new(c.args.memoryGiB)
-	}
 	if c.args.instanceType != "" {
 		spec.InstanceType = new(c.args.instanceType)
 	}
@@ -1017,17 +989,9 @@ format {{ bt }}name=filename{{ bt }}. Can be specified multiple
 times.
 `
 
-const coresFlagHelp = `
-_COUNT_ - Number of CPU cores.
-`
-
-const memoryFlagHelp = `
-_SIZE_ - Memory size in GiB.
-`
-
 const instanceTypeFlagHelp = `
-_NAME_ - Instance type name. Mutually exclusive with
-{{ bt }}--cores{{ bt }} and {{ bt }}--memory-gib{{ bt }}.
+_NAME_ - Instance type name. Specifies the compute resource
+configuration for this instance.
 `
 
 const imageFlagHelp = `
