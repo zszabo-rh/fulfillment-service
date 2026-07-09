@@ -265,12 +265,12 @@ func (m *mockClient) DeleteIdentityProvider(ctx context.Context, tenantName, ali
 	return nil
 }
 
-func (m *mockClient) CreateAuthorizationGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
+func (m *mockClient) CreateGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
 	// Return a fake group ID
 	return "test-group-id", nil
 }
 
-func (m *mockClient) DeleteAuthorizationGroup(ctx context.Context, tenantName, groupID string) error {
+func (m *mockClient) DeleteGroup(ctx context.Context, tenantName, groupID string) error {
 	return nil
 }
 

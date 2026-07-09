@@ -26,7 +26,7 @@ import (
 	"github.com/osac-project/fulfillment-service/internal/apiclient"
 )
 
-// CreateAuthorizationGroup creates a Keycloak organization group for authorization purposes.
+// CreateGroup creates a Keycloak organization group.
 // Organization groups are scoped to the organization and support hierarchical paths.
 //
 // Group path format examples:
@@ -40,8 +40,8 @@ import (
 // Organization groups are scoped per organization, so paths can be simple and readable.
 // This method creates the full hierarchy if parent groups don't exist.
 // See https://www.keycloak.org/2026/04/org-groups for details.
-func (c *Client) CreateAuthorizationGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
-	c.logger.DebugContext(ctx, "Creating tenant authorization group",
+func (c *Client) CreateGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
+	c.logger.DebugContext(ctx, "Creating tenant group",
 		slog.String("tenantName", tenantName),
 		slog.String("groupPath", groupPath),
 	)
@@ -71,7 +71,7 @@ func (c *Client) CreateAuthorizationGroup(ctx context.Context, tenantName, group
 		return "", fmt.Errorf("group was created but ID not found in cache: %s (normalized: %s)", groupPath, normalizedPath)
 	}
 
-	c.logger.DebugContext(ctx, "Created tenant authorization group",
+	c.logger.DebugContext(ctx, "Created tenant group",
 		slog.String("tenantName", tenantName),
 		slog.String("groupPath", groupPath),
 		slog.String("groupID", groupID),
@@ -80,9 +80,9 @@ func (c *Client) CreateAuthorizationGroup(ctx context.Context, tenantName, group
 	return groupID, nil
 }
 
-// DeleteAuthorizationGroup deletes a Keycloak organization group by ID.
-func (c *Client) DeleteAuthorizationGroup(ctx context.Context, tenantName, groupID string) error {
-	c.logger.DebugContext(ctx, "Deleting organization authorization group",
+// DeleteGroup deletes a Keycloak organization group by ID.
+func (c *Client) DeleteGroup(ctx context.Context, tenantName, groupID string) error {
+	c.logger.DebugContext(ctx, "Deleting organization group",
 		slog.String("tenantName", tenantName),
 		slog.String("groupID", groupID),
 	)
@@ -106,7 +106,7 @@ func (c *Client) DeleteAuthorizationGroup(ctx context.Context, tenantName, group
 	}
 	defer response.Body.Close()
 
-	c.logger.DebugContext(ctx, "Deleted organization authorization group",
+	c.logger.DebugContext(ctx, "Deleted organization group",
 		slog.String("tenantName", tenantName),
 		slog.String("groupID", groupID),
 	)
@@ -298,7 +298,7 @@ func (c *Client) getGroupIDByPathWithOrgID(ctx context.Context, orgID, groupPath
 }
 
 // GetGroupIDByPath gets a Keycloak organization group ID by its path.
-// This is exposed for use by the ResourceManager.
+// This is exposed for use by the ProjectGroupManager.
 func (c *Client) GetGroupIDByPath(ctx context.Context, tenantName, groupPath string) (string, error) {
 	return c.getGroupIDByPath(ctx, tenantName, groupPath)
 }

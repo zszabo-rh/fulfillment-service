@@ -22,7 +22,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-var _ = Describe("ResourceManager", func() {
+var _ = Describe("ProjectGroupManager", func() {
 	var (
 		ctrl       *gomock.Controller
 		mockClient *MockClientInterface
@@ -40,7 +40,7 @@ var _ = Describe("ResourceManager", func() {
 
 	Describe("Builder validation", func() {
 		It("should fail when logger is not set", func() {
-			_, err := NewResourceManager().
+			_, err := NewProjectGroupManager().
 				SetClient(mockClient).
 				Build()
 			Expect(err).To(HaveOccurred())
@@ -48,7 +48,7 @@ var _ = Describe("ResourceManager", func() {
 		})
 
 		It("should fail when client is not set", func() {
-			_, err := NewResourceManager().
+			_, err := NewProjectGroupManager().
 				SetLogger(logger).
 				Build()
 			Expect(err).To(HaveOccurred())
@@ -57,11 +57,11 @@ var _ = Describe("ResourceManager", func() {
 	})
 
 	Describe("DeleteProjectGroups", func() {
-		var manager *ResourceManager
+		var manager *ProjectGroupManager
 
 		BeforeEach(func() {
 			var err error
-			manager, err = NewResourceManager().
+			manager, err = NewProjectGroupManager().
 				SetLogger(logger).
 				SetClient(mockClient).
 				Build()
@@ -74,7 +74,7 @@ var _ = Describe("ResourceManager", func() {
 				Return("group-id-123", nil)
 
 			mockClient.EXPECT().
-				DeleteAuthorizationGroup(gomock.Any(), "test-org", "group-id-123").
+				DeleteGroup(gomock.Any(), "test-org", "group-id-123").
 				Return(nil)
 
 			err := manager.DeleteProjectGroups(ctx, "test-org", "test-project")
@@ -107,7 +107,7 @@ var _ = Describe("ResourceManager", func() {
 				Return("group-id-123", nil)
 
 			mockClient.EXPECT().
-				DeleteAuthorizationGroup(gomock.Any(), "test-org", "group-id-123").
+				DeleteGroup(gomock.Any(), "test-org", "group-id-123").
 				Return(errors.New("keycloak error"))
 
 			err := manager.DeleteProjectGroups(ctx, "test-org", "test-project")
@@ -129,11 +129,11 @@ var _ = Describe("ResourceManager", func() {
 	})
 
 	Describe("CreateProjectGroups", func() {
-		var manager *ResourceManager
+		var manager *ProjectGroupManager
 
 		BeforeEach(func() {
 			var err error
-			manager, err = NewResourceManager().
+			manager, err = NewProjectGroupManager().
 				SetLogger(logger).
 				SetClient(mockClient).
 				Build()
@@ -142,11 +142,11 @@ var _ = Describe("ResourceManager", func() {
 
 		It("should create hierarchical viewers and managers groups", func() {
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
 				Return("viewers-group-id", nil)
 
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:managers").
 				Return("managers-group-id", nil)
 
 			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "test-project")
@@ -156,15 +156,15 @@ var _ = Describe("ResourceManager", func() {
 
 		It("should rollback viewers group when managers group creation fails", func() {
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
 				Return("viewers-group-id", nil)
 
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:managers").
 				Return("", errors.New("keycloak error"))
 
 			mockClient.EXPECT().
-				DeleteAuthorizationGroup(gomock.Any(), "test-org", "viewers-group-id").
+				DeleteGroup(gomock.Any(), "test-org", "viewers-group-id").
 				Return(nil)
 
 			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "test-project")
@@ -175,7 +175,7 @@ var _ = Describe("ResourceManager", func() {
 
 		It("should return error when viewers group creation fails", func() {
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
 				Return("", errors.New("keycloak error"))
 
 			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "test-project")
@@ -202,11 +202,11 @@ var _ = Describe("ResourceManager", func() {
 			// When project path is empty, groups should be created at root level
 			// without double slashes (was "//system:viewers", should be "/system:viewers")
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/system:viewers").
+				CreateGroup(gomock.Any(), "test-org", "/system:viewers").
 				Return("viewers-group-id", nil)
 
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/system:managers").
+				CreateGroup(gomock.Any(), "test-org", "/system:managers").
 				Return("managers-group-id", nil)
 
 			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "")
@@ -216,11 +216,11 @@ var _ = Describe("ResourceManager", func() {
 
 		It("should add leading slash to project path if missing", func() {
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:viewers").
 				Return("viewers-group-id", nil)
 
 			mockClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "test-org", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "test-org", "/test-project/system:managers").
 				Return("managers-group-id", nil)
 
 			managersID, err := manager.CreateProjectGroups(ctx, "test-org", "test-project")
@@ -230,11 +230,11 @@ var _ = Describe("ResourceManager", func() {
 	})
 
 	Describe("AddUserToProjectGroup", func() {
-		var manager *ResourceManager
+		var manager *ProjectGroupManager
 
 		BeforeEach(func() {
 			var err error
-			manager, err = NewResourceManager().
+			manager, err = NewProjectGroupManager().
 				SetLogger(logger).
 				SetClient(mockClient).
 				Build()
@@ -323,11 +323,11 @@ var _ = Describe("ResourceManager", func() {
 	})
 
 	Describe("RemoveUserFromProjectGroup", func() {
-		var manager *ResourceManager
+		var manager *ProjectGroupManager
 
 		BeforeEach(func() {
 			var err error
-			manager, err = NewResourceManager().
+			manager, err = NewProjectGroupManager().
 				SetLogger(logger).
 				SetClient(mockClient).
 				Build()

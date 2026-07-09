@@ -38,10 +38,10 @@ import (
 
 // FunctionBuilder contains the data needed to build instances of the reconciler function.
 type FunctionBuilder struct {
-	logger          *slog.Logger
-	connection      *grpc.ClientConn
-	resourceManager *idp.ResourceManager
-	usersClient     privatev1.UsersClient
+	logger              *slog.Logger
+	connection          *grpc.ClientConn
+	projectGroupManager *idp.ProjectGroupManager
+	usersClient         privatev1.UsersClient
 }
 
 // NewFunction creates a builder that can be used to configure and create reconciler functions.
@@ -61,9 +61,9 @@ func (b *FunctionBuilder) SetConnection(value *grpc.ClientConn) *FunctionBuilder
 	return b
 }
 
-// SetResourceManager sets the resource manager that the reconciler will use to manage authorization resources.
-func (b *FunctionBuilder) SetResourceManager(value *idp.ResourceManager) *FunctionBuilder {
-	b.resourceManager = value
+// SetProjectGroupManager sets the project group manager that the reconciler will use to manage project authorization groups.
+func (b *FunctionBuilder) SetProjectGroupManager(value *idp.ProjectGroupManager) *FunctionBuilder {
+	b.projectGroupManager = value
 	return b
 }
 
@@ -83,8 +83,8 @@ func (b *FunctionBuilder) Build() (result *function, err error) {
 		err = errors.New("connection is mandatory")
 		return
 	}
-	if b.resourceManager == nil {
-		err = errors.New("resource manager is mandatory")
+	if b.projectGroupManager == nil {
+		err = errors.New("project group manager is mandatory")
 		return
 	}
 
@@ -94,24 +94,24 @@ func (b *FunctionBuilder) Build() (result *function, err error) {
 	}
 
 	result = &function{
-		logger:          b.logger,
-		projectsClient:  privatev1.NewProjectsClient(b.connection),
-		tenantsClient:   privatev1.NewTenantsClient(b.connection),
-		usersClient:     usersClient,
-		resourceManager: b.resourceManager,
-		maskCalculator:  masks.NewCalculator().Build(),
+		logger:              b.logger,
+		projectsClient:      privatev1.NewProjectsClient(b.connection),
+		tenantsClient:       privatev1.NewTenantsClient(b.connection),
+		usersClient:         usersClient,
+		projectGroupManager: b.projectGroupManager,
+		maskCalculator:      masks.NewCalculator().Build(),
 	}
 	return
 }
 
 // function is the implementation of the reconciler function.
 type function struct {
-	logger          *slog.Logger
-	projectsClient  privatev1.ProjectsClient
-	tenantsClient   privatev1.TenantsClient
-	usersClient     privatev1.UsersClient
-	resourceManager *idp.ResourceManager
-	maskCalculator  *masks.Calculator
+	logger              *slog.Logger
+	projectsClient      privatev1.ProjectsClient
+	tenantsClient       privatev1.TenantsClient
+	usersClient         privatev1.UsersClient
+	projectGroupManager *idp.ProjectGroupManager
+	maskCalculator      *masks.Calculator
 }
 
 // Run executes the reconciliation logic for the given project.
@@ -218,7 +218,7 @@ func (t *task) validateAndActivate(ctx context.Context) error {
 
 	// Create Keycloak groups for project authorization
 	// Returns the system:managers group ID to avoid timing issues with group lookup
-	managersGroupID, err := t.r.resourceManager.CreateProjectGroups(ctx, projectTenant, projectPath)
+	managersGroupID, err := t.r.projectGroupManager.CreateProjectGroups(ctx, projectTenant, projectPath)
 	if err != nil {
 		t.updateCondition(
 			privatev1.ProjectConditionType_PROJECT_CONDITION_TYPE_KEYCLOAK_SYNC,
@@ -275,7 +275,7 @@ func (t *task) validateAndActivate(ctx context.Context) error {
 					slog.String("!creator", creatorUsername),
 				)
 			} else {
-				if err := t.r.resourceManager.AddUserToGroupByID(ctx,
+				if err := t.r.projectGroupManager.AddUserToGroupByID(ctx,
 					t.project.GetMetadata().GetTenant(),
 					keycloakUserID,
 					managersGroupID); err != nil {
@@ -366,7 +366,7 @@ func (t *task) delete(ctx context.Context) error {
 	}
 
 	// Clean up Keycloak groups
-	err = t.r.resourceManager.DeleteProjectGroups(ctx,
+	err = t.r.projectGroupManager.DeleteProjectGroups(ctx,
 		t.project.GetMetadata().GetTenant(),
 		t.project.GetMetadata().GetName())
 	if err != nil {

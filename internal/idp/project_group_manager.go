@@ -13,8 +13,6 @@ language governing permissions and limitations under the License.
 
 package idp
 
-//go:generate go run go.uber.org/mock/mockgen -destination=resource_manager_mock.go -package=idp . ResourceManagerInterface
-
 import (
 	"context"
 	"errors"
@@ -24,46 +22,37 @@ import (
 	"strings"
 )
 
-// ResourceManagerInterface defines the interface for resource management operations.
-type ResourceManagerInterface interface {
-	DeleteProjectGroups(ctx context.Context, tenant, projectName string) error
-	CreateProjectGroups(ctx context.Context, tenant, projectName string) (string, error)
-	AddUserToProjectGroup(ctx context.Context, tenant, projectName, username, groupType string) error
-	AddUserToGroupByID(ctx context.Context, tenant, username, groupID string) error
-	RemoveUserFromProjectGroup(ctx context.Context, tenant, projectName, username, groupType string) error
-}
-
-// ResourceManager handles Keycloak group operations for authorization.
-type ResourceManager struct {
+// ProjectGroupManager handles Keycloak group operations for project authorization.
+type ProjectGroupManager struct {
 	logger *slog.Logger
 	client ClientInterface
 }
 
-// ResourceManagerBuilder builds the resource manager.
-type ResourceManagerBuilder struct {
+// ProjectGroupManagerBuilder builds the project group manager.
+type ProjectGroupManagerBuilder struct {
 	logger *slog.Logger
 	client ClientInterface
 }
 
-// NewResourceManager creates a builder for the resource manager.
-func NewResourceManager() *ResourceManagerBuilder {
-	return &ResourceManagerBuilder{}
+// NewProjectGroupManager creates a builder for the project group manager.
+func NewProjectGroupManager() *ProjectGroupManagerBuilder {
+	return &ProjectGroupManagerBuilder{}
 }
 
 // SetLogger sets the logger.
-func (b *ResourceManagerBuilder) SetLogger(value *slog.Logger) *ResourceManagerBuilder {
+func (b *ProjectGroupManagerBuilder) SetLogger(value *slog.Logger) *ProjectGroupManagerBuilder {
 	b.logger = value
 	return b
 }
 
 // SetClient sets the Keycloak client.
-func (b *ResourceManagerBuilder) SetClient(value ClientInterface) *ResourceManagerBuilder {
+func (b *ProjectGroupManagerBuilder) SetClient(value ClientInterface) *ProjectGroupManagerBuilder {
 	b.client = value
 	return b
 }
 
 // Build creates the manager.
-func (b *ResourceManagerBuilder) Build() (result *ResourceManager, err error) {
+func (b *ProjectGroupManagerBuilder) Build() (result *ProjectGroupManager, err error) {
 	if b.logger == nil {
 		err = errors.New("logger is mandatory")
 		return
@@ -73,7 +62,7 @@ func (b *ResourceManagerBuilder) Build() (result *ResourceManager, err error) {
 		return
 	}
 
-	result = &ResourceManager{
+	result = &ProjectGroupManager{
 		logger: b.logger,
 		client: b.client,
 	}
@@ -81,7 +70,7 @@ func (b *ResourceManagerBuilder) Build() (result *ResourceManager, err error) {
 }
 
 // DeleteProjectGroups deletes tenant authorization groups for a project.
-func (m *ResourceManager) DeleteProjectGroups(ctx context.Context, tenant, projectName string) error {
+func (m *ProjectGroupManager) DeleteProjectGroups(ctx context.Context, tenant, projectName string) error {
 	if tenant == "" {
 		return fmt.Errorf("tenant is required")
 	}
@@ -114,7 +103,7 @@ func (m *ResourceManager) DeleteProjectGroups(ctx context.Context, tenant, proje
 		return fmt.Errorf("failed to get project group ID: %w", err)
 	}
 
-	if err = m.client.DeleteAuthorizationGroup(ctx, tenant, projectGroupID); err != nil {
+	if err = m.client.DeleteGroup(ctx, tenant, projectGroupID); err != nil {
 		m.logger.ErrorContext(ctx, "Failed to delete project group",
 			slog.String("group_id", projectGroupID),
 			slog.String("group_path", projectGroupPath),
@@ -133,7 +122,7 @@ func (m *ResourceManager) DeleteProjectGroups(ctx context.Context, tenant, proje
 }
 
 // getGroupIDByPath is a helper to get the group ID from a group path.
-func (m *ResourceManager) getGroupIDByPath(ctx context.Context, tenantName, groupPath string) (string, error) {
+func (m *ProjectGroupManager) getGroupIDByPath(ctx context.Context, tenantName, groupPath string) (string, error) {
 	return m.client.GetGroupIDByPath(ctx, tenantName, groupPath)
 }
 
@@ -141,7 +130,7 @@ func (m *ResourceManager) getGroupIDByPath(ctx context.Context, tenantName, grou
 // Creates hierarchical groups: /{project-name}/system:viewers and /{project-name}/system:managers
 // These groups are used by Authorino OPA policies for authorization.
 // Returns the managers group ID for immediate use (avoids timing issues with group lookup).
-func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, projectPath string) (string, error) {
+func (m *ProjectGroupManager) CreateProjectGroups(ctx context.Context, tenant, projectPath string) (string, error) {
 	if tenant == "" {
 		return "", fmt.Errorf("tenant is required")
 	}
@@ -162,7 +151,7 @@ func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, proje
 
 	// Create the viewers group:
 	viewersGroupPath := path.Join(projectPath, GroupNameViewers)
-	viewersGroupID, err := m.client.CreateAuthorizationGroup(ctx, tenant, viewersGroupPath)
+	viewersGroupID, err := m.client.CreateGroup(ctx, tenant, viewersGroupPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create viewers group: %w", err)
 	}
@@ -177,10 +166,10 @@ func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, proje
 
 	// Create the managers group:
 	managersGroupPath := path.Join(projectPath, GroupNameManagers)
-	managersGroupID, err := m.client.CreateAuthorizationGroup(ctx, tenant, managersGroupPath)
+	managersGroupID, err := m.client.CreateGroup(ctx, tenant, managersGroupPath)
 	if err != nil {
 		// Clean up viewers group on failure
-		if cleanupErr := m.client.DeleteAuthorizationGroup(ctx, tenant, viewersGroupID); cleanupErr != nil {
+		if cleanupErr := m.client.DeleteGroup(ctx, tenant, viewersGroupID); cleanupErr != nil {
 			m.logger.ErrorContext(
 				ctx,
 				"Failed to cleanup viewers group during rollback",
@@ -204,7 +193,7 @@ func (m *ResourceManager) CreateProjectGroups(ctx context.Context, tenant, proje
 }
 
 // AddUserToProjectGroup adds a user to a project group (system:viewers or system:managers).
-func (m *ResourceManager) AddUserToProjectGroup(ctx context.Context, tenant, projectPath, username, groupType string) error {
+func (m *ProjectGroupManager) AddUserToProjectGroup(ctx context.Context, tenant, projectPath, username, groupType string) error {
 	if tenant == "" {
 		return fmt.Errorf("tenant is required")
 	}
@@ -245,7 +234,7 @@ func (m *ResourceManager) AddUserToProjectGroup(ctx context.Context, tenant, pro
 
 // AddUserToGroupByID adds a user to a group using the group ID directly.
 // This avoids timing issues with group lookup for recently created groups.
-func (m *ResourceManager) AddUserToGroupByID(ctx context.Context, tenant, username, groupID string) error {
+func (m *ProjectGroupManager) AddUserToGroupByID(ctx context.Context, tenant, username, groupID string) error {
 	if tenant == "" {
 		return fmt.Errorf("tenant is required")
 	}
@@ -270,7 +259,7 @@ func (m *ResourceManager) AddUserToGroupByID(ctx context.Context, tenant, userna
 }
 
 // RemoveUserFromProjectGroup removes a user from a project group (system:viewers or system:managers).
-func (m *ResourceManager) RemoveUserFromProjectGroup(ctx context.Context, tenant, projectPath, username, groupType string) error {
+func (m *ProjectGroupManager) RemoveUserFromProjectGroup(ctx context.Context, tenant, projectPath, username, groupType string) error {
 	if tenant == "" {
 		return fmt.Errorf("tenant is required")
 	}

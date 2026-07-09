@@ -162,7 +162,7 @@ var _ = Describe("Validation and Activation", func() {
 		mockClient      *MockProjectsClient
 		mockUsersClient *MockUsersClient
 		mockIdpClient   *idp.MockClientInterface
-		resourceManager *idp.ResourceManager
+		resourceManager *idp.ProjectGroupManager
 		ctx             context.Context
 		functionObj     *function
 	)
@@ -175,17 +175,17 @@ var _ = Describe("Validation and Activation", func() {
 		ctx = context.Background()
 
 		var err error
-		resourceManager, err = idp.NewResourceManager().
+		resourceManager, err = idp.NewProjectGroupManager().
 			SetLogger(logger).
 			SetClient(mockIdpClient).
 			Build()
 		Expect(err).ToNot(HaveOccurred())
 
 		functionObj = &function{
-			logger:          logger,
-			projectsClient:  mockClient,
-			usersClient:     mockUsersClient,
-			resourceManager: resourceManager,
+			logger:              logger,
+			projectsClient:      mockClient,
+			usersClient:         mockUsersClient,
+			projectGroupManager: resourceManager,
 		}
 	})
 
@@ -211,12 +211,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			task := &task{
@@ -247,12 +247,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			task := &task{
@@ -316,12 +316,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/parent-project/child-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/parent-project/child-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/parent-project/child-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/parent-project/child-project/system:managers").
 				Return("managers-id", nil)
 
 			task := &task{
@@ -374,7 +374,7 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(
+				CreateGroup(
 					gomock.Any(),
 					"acme",
 					"/parent/child/system:viewers",
@@ -383,7 +383,7 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect managers group creation (new tenant groups API)
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(
+				CreateGroup(
 					gomock.Any(),
 					"acme",
 					"/parent/child/system:managers",
@@ -553,12 +553,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// Expect user lookup to get Keycloak ID
@@ -609,12 +609,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// User not found
@@ -652,12 +652,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// User lookup fails with internal error
@@ -695,12 +695,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// User found but no Keycloak ID
@@ -745,12 +745,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// Expect user lookup
@@ -798,12 +798,12 @@ var _ = Describe("Validation and Activation", func() {
 
 			// Expect viewers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:viewers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:viewers").
 				Return("viewers-id", nil)
 
 			// Expect managers group creation
 			mockIdpClient.EXPECT().
-				CreateAuthorizationGroup(gomock.Any(), "acme", "/test-project/system:managers").
+				CreateGroup(gomock.Any(), "acme", "/test-project/system:managers").
 				Return("managers-id", nil)
 
 			// Should not attempt to look up user or add to group
@@ -879,7 +879,7 @@ var _ = Describe("Deletion Cleanup", func() {
 		mockClient        *MockProjectsClient
 		mockTenantsClient *MockTenantsClient
 		mockIdpClient     *idp.MockClientInterface
-		resourceManager   *idp.ResourceManager
+		resourceManager   *idp.ProjectGroupManager
 		ctx               context.Context
 		functionObj       *function
 	)
@@ -892,17 +892,17 @@ var _ = Describe("Deletion Cleanup", func() {
 		ctx = context.Background()
 
 		var err error
-		resourceManager, err = idp.NewResourceManager().
+		resourceManager, err = idp.NewProjectGroupManager().
 			SetLogger(logger).
 			SetClient(mockIdpClient).
 			Build()
 		Expect(err).ToNot(HaveOccurred())
 
 		functionObj = &function{
-			logger:          logger,
-			projectsClient:  mockClient,
-			tenantsClient:   mockTenantsClient,
-			resourceManager: resourceManager,
+			logger:              logger,
+			projectsClient:      mockClient,
+			tenantsClient:       mockTenantsClient,
+			projectGroupManager: resourceManager,
 		}
 	})
 
@@ -964,7 +964,7 @@ var _ = Describe("Deletion Cleanup", func() {
 
 		// Expect parent project group deletion (cascades to delete system:viewers and system:managers subgroups)
 		mockIdpClient.EXPECT().
-			DeleteAuthorizationGroup(gomock.Any(), "acme", "project-group-id").
+			DeleteGroup(gomock.Any(), "acme", "project-group-id").
 			Return(nil)
 
 		task := &task{

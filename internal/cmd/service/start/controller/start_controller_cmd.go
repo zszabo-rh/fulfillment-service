@@ -374,13 +374,13 @@ func (r *runnerContext) run(cmd *cobra.Command, argv []string) error { //nolint:
 	}
 
 	// Create the IDP resource manager:
-	r.logger.InfoContext(ctx, "Creating IDP resource manager")
-	resourceManager, err := idp.NewResourceManager().
+	r.logger.InfoContext(ctx, "Creating IDP project group manager")
+	projectGroupManager, err := idp.NewProjectGroupManager().
 		SetLogger(r.logger).
 		SetClient(idpClient).
 		Build()
 	if err != nil {
-		return fmt.Errorf("failed to create IDP resource manager: %w", err)
+		return fmt.Errorf("failed to create IDP project group manager: %w", err)
 	}
 
 	// Create the cluster reconciler:
@@ -1016,7 +1016,7 @@ func (r *runnerContext) run(cmd *cobra.Command, argv []string) error { //nolint:
 	projectReconcilerFunction, err := project.NewFunction().
 		SetLogger(r.logger).
 		SetConnection(r.client).
-		SetResourceManager(resourceManager).
+		SetProjectGroupManager(projectGroupManager).
 		Build()
 	if err != nil {
 		return fmt.Errorf("failed to create project reconciler function: %w", err)

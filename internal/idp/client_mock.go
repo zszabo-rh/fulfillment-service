@@ -124,19 +124,19 @@ func (mr *MockClientInterfaceMockRecorder) AssignTenantRolesToUser(ctx, tenantNa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignTenantRolesToUser", reflect.TypeOf((*MockClientInterface)(nil).AssignTenantRolesToUser), ctx, tenantName, userID, roles)
 }
 
-// CreateAuthorizationGroup mocks base method.
-func (m *MockClientInterface) CreateAuthorizationGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
+// CreateGroup mocks base method.
+func (m *MockClientInterface) CreateGroup(ctx context.Context, tenantName, groupPath string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAuthorizationGroup", ctx, tenantName, groupPath)
+	ret := m.ctrl.Call(m, "CreateGroup", ctx, tenantName, groupPath)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// CreateAuthorizationGroup indicates an expected call of CreateAuthorizationGroup.
-func (mr *MockClientInterfaceMockRecorder) CreateAuthorizationGroup(ctx, tenantName, groupPath any) *gomock.Call {
+// CreateGroup indicates an expected call of CreateGroup.
+func (mr *MockClientInterfaceMockRecorder) CreateGroup(ctx, tenantName, groupPath any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAuthorizationGroup", reflect.TypeOf((*MockClientInterface)(nil).CreateAuthorizationGroup), ctx, tenantName, groupPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateGroup", reflect.TypeOf((*MockClientInterface)(nil).CreateGroup), ctx, tenantName, groupPath)
 }
 
 // CreateIdentityProvider mocks base method.
@@ -199,18 +199,18 @@ func (mr *MockClientInterfaceMockRecorder) CreateUserInRealm(ctx, user any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUserInRealm", reflect.TypeOf((*MockClientInterface)(nil).CreateUserInRealm), ctx, user)
 }
 
-// DeleteAuthorizationGroup mocks base method.
-func (m *MockClientInterface) DeleteAuthorizationGroup(ctx context.Context, tenantName, groupID string) error {
+// DeleteGroup mocks base method.
+func (m *MockClientInterface) DeleteGroup(ctx context.Context, tenantName, groupID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAuthorizationGroup", ctx, tenantName, groupID)
+	ret := m.ctrl.Call(m, "DeleteGroup", ctx, tenantName, groupID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteAuthorizationGroup indicates an expected call of DeleteAuthorizationGroup.
-func (mr *MockClientInterfaceMockRecorder) DeleteAuthorizationGroup(ctx, tenantName, groupID any) *gomock.Call {
+// DeleteGroup indicates an expected call of DeleteGroup.
+func (mr *MockClientInterfaceMockRecorder) DeleteGroup(ctx, tenantName, groupID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAuthorizationGroup", reflect.TypeOf((*MockClientInterface)(nil).DeleteAuthorizationGroup), ctx, tenantName, groupID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteGroup", reflect.TypeOf((*MockClientInterface)(nil).DeleteGroup), ctx, tenantName, groupID)
 }
 
 // DeleteIdentityProvider mocks base method.

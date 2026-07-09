@@ -51,8 +51,8 @@ type ClientInterface interface {
 	GetIdentityProvider(ctx context.Context, tenantName, alias string) (*IdentityProvider, error)
 	DeleteIdentityProvider(ctx context.Context, tenantName, alias string) error
 	ListIdentityProviders(ctx context.Context, tenantName string) ([]*IdentityProvider, error)
-	CreateAuthorizationGroup(ctx context.Context, tenantName, groupPath string) (string, error)
-	DeleteAuthorizationGroup(ctx context.Context, tenantName, groupID string) error
+	CreateGroup(ctx context.Context, tenantName, groupPath string) (string, error)
+	DeleteGroup(ctx context.Context, tenantName, groupID string) error
 	GetGroupIDByPath(ctx context.Context, tenantName, groupPath string) (string, error)
 	AddUserToGroup(ctx context.Context, tenantName, idpUserID, groupID string) error
 	RemoveUserFromGroup(ctx context.Context, tenantName, idpUserID, groupID string) error
