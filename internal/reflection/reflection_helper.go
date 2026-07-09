@@ -831,6 +831,7 @@ var platformScopedTypes = map[protoreflect.Name]bool{
 	"PublicIPPool":     true,
 	"Role":             true,
 	"StorageBackend":   true,
+	"StorageTier":      true,
 	"Tenant":           true,
 	"User":             true,
 }

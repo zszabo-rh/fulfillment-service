@@ -26,6 +26,8 @@ import (
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/publicip"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/publicipattachment"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/securitygroup"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/storagebackend"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/storagetier"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/subnet"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/virtualnetwork"
 )
@@ -48,6 +50,8 @@ func Cmd() *cobra.Command {
 	result.AddCommand(virtualnetwork.Cmd())
 	result.AddCommand(subnet.Cmd())
 	result.AddCommand(securitygroup.Cmd())
+	result.AddCommand(storagebackend.Cmd())
+	result.AddCommand(storagetier.Cmd())
 	return result
 }
 
