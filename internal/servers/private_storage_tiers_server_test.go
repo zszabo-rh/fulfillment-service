@@ -31,10 +31,17 @@ import (
 var _ = Describe("Private storage tiers server", func() {
 	Describe("Creation", func() {
 		It("Can be built if all the required parameters are set", func() {
+			backendsDAO, err := dao.NewGenericDAO[*privatev1.StorageBackend]().
+				SetLogger(logger).
+				SetTenancyLogic(tenancy).
+				Build()
+			Expect(err).ToNot(HaveOccurred())
+
 			server, err := NewPrivateStorageTiersServer().
 				SetLogger(logger).
 				SetAttributionLogic(attribution).
 				SetTenancyLogic(tenancy).
+				SetStorageBackendsDAO(backendsDAO).
 				Build()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(server).ToNot(BeNil())
@@ -55,6 +62,16 @@ var _ = Describe("Private storage tiers server", func() {
 				SetAttributionLogic(attribution).
 				Build()
 			Expect(err).To(MatchError("tenancy logic is mandatory"))
+			Expect(server).To(BeNil())
+		})
+
+		It("Fails if storage backends DAO is not set", func() {
+			server, err := NewPrivateStorageTiersServer().
+				SetLogger(logger).
+				SetAttributionLogic(attribution).
+				SetTenancyLogic(tenancy).
+				Build()
+			Expect(err).To(MatchError("storage backends DAO is mandatory"))
 			Expect(server).To(BeNil())
 		})
 	})
@@ -539,6 +556,22 @@ var _ = Describe("Private storage tiers server", func() {
 				Expect(st.Code()).To(Equal(codes.InvalidArgument))
 				Expect(st.Message()).To(ContainSubstring("one backend"))
 			})
+
+			It("Update clearing backends fails", func() {
+				created := createStorageTier()
+
+				_, err := server.Update(ctx, privatev1.StorageTiersUpdateRequest_builder{
+					Object: privatev1.StorageTier_builder{
+						Id: created.GetId(),
+					}.Build(),
+					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"backends"}},
+				}.Build())
+				Expect(err).To(HaveOccurred())
+				st, ok := status.FromError(err)
+				Expect(ok).To(BeTrue())
+				Expect(st.Code()).To(Equal(codes.InvalidArgument))
+				Expect(st.Message()).To(ContainSubstring("backends"))
+			})
 		})
 
 		Describe("Immutability", func() {
@@ -576,7 +609,8 @@ var _ = Describe("Private storage tiers server", func() {
 				Expect(err).To(HaveOccurred())
 				st, ok := status.FromError(err)
 				Expect(ok).To(BeTrue())
-				Expect(st.Code()).ToNot(Equal(codes.OK))
+				Expect(st.Code()).To(Equal(codes.InvalidArgument))
+				Expect(st.Message()).To(ContainSubstring("immutable"))
 			})
 		})
 

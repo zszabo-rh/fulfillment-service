@@ -21,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	privatev1 "github.com/osac-project/fulfillment-service/internal/api/osac/private/v1"
 	"github.com/osac-project/fulfillment-service/internal/auth"
@@ -88,6 +89,10 @@ func (b *PrivateStorageTiersServerBuilder) Build() (result *PrivateStorageTiersS
 	}
 	if b.tenancyLogic == nil {
 		err = errors.New("tenancy logic is mandatory")
+		return
+	}
+	if b.storageBackendsDAO == nil {
+		err = errors.New("storage backends DAO is mandatory")
 		return
 	}
 
@@ -163,7 +168,7 @@ func (s *PrivateStorageTiersServer) Update(ctx context.Context,
 
 	existingST := getResponse.GetObject()
 
-	err = s.validateStorageTierUpdate(ctx, request.GetObject(), existingST)
+	err = s.validateStorageTierUpdate(ctx, request.GetObject(), existingST, request.GetUpdateMask())
 	if err != nil {
 		return
 	}
@@ -197,32 +202,12 @@ func (s *PrivateStorageTiersServer) validateStorageTierCreate(ctx context.Contex
 	if len(backends) == 0 {
 		return grpcstatus.Errorf(grpccodes.InvalidArgument, "field 'backends' is required and must not be empty")
 	}
-	if len(backends) > 1 {
-		return grpcstatus.Errorf(grpccodes.InvalidArgument,
-			"only one backend association is supported in v0.1, but %d were provided", len(backends))
-	}
-	for _, ba := range backends {
-		if ba.GetBackendId() == "" {
-			return grpcstatus.Errorf(grpccodes.InvalidArgument, "field 'backends[].backend_id' is required")
-		}
-		if s.storageBackendsDAO != nil {
-			_, err := s.storageBackendsDAO.Get().SetId(ba.GetBackendId()).Do(ctx)
-			if err != nil {
-				var notFoundErr *dao.ErrNotFound
-				if errors.As(err, &notFoundErr) {
-					return grpcstatus.Errorf(grpccodes.NotFound,
-						"storage backend with identifier '%s' not found", ba.GetBackendId())
-				}
-				return grpcstatus.Errorf(grpccodes.Internal,
-					"failed to validate storage backend '%s'", ba.GetBackendId())
-			}
-		}
-	}
-	return nil
+	return s.validateBackends(ctx, backends)
 }
 
 func (s *PrivateStorageTiersServer) validateStorageTierUpdate(ctx context.Context,
-	newST *privatev1.StorageTier, existingST *privatev1.StorageTier) error {
+	newST *privatev1.StorageTier, existingST *privatev1.StorageTier,
+	updateMask *fieldmaskpb.FieldMask) error {
 
 	if newST.GetMetadata() != nil && newST.GetMetadata().GetName() != "" &&
 		newST.GetMetadata().GetName() != existingST.GetMetadata().GetName() {
@@ -231,27 +216,41 @@ func (s *PrivateStorageTiersServer) validateStorageTierUpdate(ctx context.Contex
 			existingST.GetMetadata().GetName(), newST.GetMetadata().GetName())
 	}
 	backends := newST.GetBackends()
-	if len(backends) > 0 {
-		if len(backends) > 1 {
-			return grpcstatus.Errorf(grpccodes.InvalidArgument,
-				"only one backend association is supported in v0.1, but %d were provided", len(backends))
+	if updateMask != nil {
+		for _, path := range updateMask.GetPaths() {
+			if path == "backends" && len(backends) == 0 {
+				return grpcstatus.Errorf(grpccodes.InvalidArgument,
+					"field 'backends' is required and must not be empty")
+			}
 		}
-		for _, ba := range backends {
-			if ba.GetBackendId() == "" {
-				return grpcstatus.Errorf(grpccodes.InvalidArgument, "field 'backends[].backend_id' is required")
+	}
+	if len(backends) > 0 {
+		if err := s.validateBackends(ctx, backends); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *PrivateStorageTiersServer) validateBackends(ctx context.Context,
+	backends []*privatev1.BackendAssociation) error {
+	if len(backends) > 1 {
+		return grpcstatus.Errorf(grpccodes.InvalidArgument,
+			"only one backend association is supported in v0.1, but %d were provided", len(backends))
+	}
+	for _, ba := range backends {
+		if ba.GetBackendId() == "" {
+			return grpcstatus.Errorf(grpccodes.InvalidArgument, "field 'backends[].backend_id' is required")
+		}
+		_, err := s.storageBackendsDAO.Get().SetId(ba.GetBackendId()).Do(ctx)
+		if err != nil {
+			var notFoundErr *dao.ErrNotFound
+			if errors.As(err, &notFoundErr) {
+				return grpcstatus.Errorf(grpccodes.NotFound,
+					"storage backend with identifier '%s' not found", ba.GetBackendId())
 			}
-			if s.storageBackendsDAO != nil {
-				_, err := s.storageBackendsDAO.Get().SetId(ba.GetBackendId()).Do(ctx)
-				if err != nil {
-					var notFoundErr *dao.ErrNotFound
-					if errors.As(err, &notFoundErr) {
-						return grpcstatus.Errorf(grpccodes.NotFound,
-							"storage backend with identifier '%s' not found", ba.GetBackendId())
-					}
-					return grpcstatus.Errorf(grpccodes.Internal,
-						"failed to validate storage backend '%s'", ba.GetBackendId())
-				}
-			}
+			return grpcstatus.Errorf(grpccodes.Internal,
+				"failed to validate storage backend '%s'", ba.GetBackendId())
 		}
 	}
 	return nil
