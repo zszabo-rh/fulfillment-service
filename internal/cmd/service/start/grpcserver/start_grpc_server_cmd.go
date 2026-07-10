@@ -995,6 +995,30 @@ func (c *runnerContext) run(cmd *cobra.Command, argv []string) error { //nolint:
 	}
 	privatev1.RegisterStorageBackendsServer(grpcServer, privateStorageBackendsServer)
 
+	// Create the storage backends DAO for cross-resource validation in the storage tiers server:
+	storageBackendsDAO, err := dao.NewGenericDAO[*privatev1.StorageBackend]().
+		SetLogger(c.logger).
+		SetTenancyLogic(tenancyLogic).
+		Build()
+	if err != nil {
+		return fmt.Errorf("failed to create storage backends DAO: %w", err)
+	}
+
+	// Create the private storage tiers server:
+	c.logger.InfoContext(ctx, "Creating private storage tiers server")
+	privateStorageTiersServer, err := servers.NewPrivateStorageTiersServer().
+		SetLogger(c.logger).
+		SetNotifier(notifier).
+		SetAttributionLogic(privateAttributionLogic).
+		SetTenancyLogic(tenancyLogic).
+		SetMetricsRegisterer(metricsRegisterer).
+		SetStorageBackendsDAO(storageBackendsDAO).
+		Build()
+	if err != nil {
+		return fmt.Errorf("failed to create private storage tiers server: %w", err)
+	}
+	privatev1.RegisterStorageTiersServer(grpcServer, privateStorageTiersServer)
+
 	// Create the roles server:
 	c.logger.InfoContext(ctx, "Creating roles server")
 	rolesServer, err := servers.NewRolesServer().

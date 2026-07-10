@@ -41,6 +41,8 @@ import (
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/publicip"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/publicipattachment"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/securitygroup"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/storagebackend"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/storagetier"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/subnet"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/virtualnetwork"
 	"github.com/osac-project/fulfillment-service/internal/config"
@@ -73,6 +75,8 @@ func Cmd() *cobra.Command {
 	result.AddCommand(virtualnetwork.Cmd())
 	result.AddCommand(subnet.Cmd())
 	result.AddCommand(securitygroup.Cmd())
+	result.AddCommand(storagebackend.Cmd())
+	result.AddCommand(storagetier.Cmd())
 	flags := result.Flags()
 	flags.StringVarP(
 		&runner.args.file,

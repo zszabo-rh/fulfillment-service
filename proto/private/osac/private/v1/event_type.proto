@@ -44,6 +44,7 @@ import "osac/private/v1/role_binding_type.proto";
 import "osac/private/v1/role_type.proto";
 import "osac/private/v1/security_group_type.proto";
 import "osac/private/v1/storage_backend_type.proto";
+import "osac/private/v1/storage_tier_type.proto";
 import "osac/private/v1/subnet_type.proto";
 import "osac/private/v1/user_type.proto";
 import "osac/private/v1/virtual_network_type.proto";
@@ -92,6 +93,7 @@ message Event {
     ExternalIPAttachment external_ip_attachment = 36;
     NATGateway nat_gateway = 37;
     ClusterVersion cluster_version = 38;
+    StorageTier storage_tier = 39;
   }
 }
 
