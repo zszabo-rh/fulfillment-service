@@ -405,7 +405,6 @@ func validateNetworkDefaults(defaults *privatev1.NetworkDefaults) error {
 				"defaults.virtual_network_cidr: %v", err)
 		}
 		vnPrefix, _ = netip.ParsePrefix(parsed)
-		_ = vnPrefix
 	}
 
 	if subnetCIDR != "" {
