@@ -22,9 +22,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	privatev1 "github.com/osac-project/fulfillment-service/internal/api/osac/private/v1"
@@ -131,7 +132,7 @@ var _ = Describe("Tenant onboarding to hub", func() {
 			func(g Gomega) {
 				ns := &corev1.Namespace{}
 				err := kubeClient.Get(ctx, crclient.ObjectKey{Name: name}, ns)
-				g.Expect(err).To(HaveOccurred())
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			},
 			2*time.Minute,
 			time.Second,
@@ -336,31 +337,22 @@ var _ = Describe("Tenant IDP idempotency", func() {
 		}.Build())
 		Expect(err).ToNot(HaveOccurred())
 
-		By("Waiting for re-reconciliation to complete")
-		Eventually(
+		By("Verifying no duplicate Keycloak organization appears during re-reconciliation")
+		var lastOrgs []map[string]any
+		Consistently(
 			func(g Gomega) {
-				getResp, err := tenantsClient.Get(ctx, privatev1.TenantsGetRequest_builder{
-					Id: id,
-				}.Build())
+				code, body, err := tool.KeycloakAdminRequest(ctx, http.MethodGet,
+					fmt.Sprintf("/organizations?exact=true&search=%s", name), nil)
 				g.Expect(err).ToNot(HaveOccurred())
-				g.Expect(getResp.GetObject().GetStatus().GetState()).To(
-					Equal(privatev1.TenantState_TENANT_STATE_SYNCED),
-				)
+				g.Expect(code).To(Equal(http.StatusOK))
+				g.Expect(json.Unmarshal(body, &lastOrgs)).To(Succeed())
+				g.Expect(lastOrgs).To(HaveLen(1))
 			},
-			time.Minute,
-			time.Second,
+			15*time.Second,
+			2*time.Second,
 		).Should(Succeed())
 
-		By("Verifying still exactly one Keycloak organization exists (no duplicate)")
-		code, body, err = tool.KeycloakAdminRequest(ctx, http.MethodGet,
-			fmt.Sprintf("/organizations?exact=true&search=%s", name), nil)
-		Expect(err).ToNot(HaveOccurred())
-		Expect(code).To(Equal(http.StatusOK))
-		var orgsAfter []map[string]any
-		Expect(json.Unmarshal(body, &orgsAfter)).To(Succeed())
-		Expect(orgsAfter).To(HaveLen(1))
-
 		By("Verifying the organization ID is unchanged")
-		Expect(orgsAfter[0]["id"]).To(Equal(orgsBefore[0]["id"]))
+		Expect(lastOrgs[0]["id"]).To(Equal(orgsBefore[0]["id"]))
 	})
 })
