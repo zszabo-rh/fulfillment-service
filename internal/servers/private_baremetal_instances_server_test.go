@@ -991,7 +991,7 @@ var _ = Describe("Private bare metal instances server", func() {
 			Expect(response.GetObject().GetSpec().GetTemplateParameters()).To(HaveKey("os_version"))
 		})
 
-		It("Overrides non-editable field_definition alongside template_parameters", func() {
+		It("Rejects user value for non-editable field_definition alongside template_parameters", func() {
 			createTemplate("override-combo-template", []*privatev1.BareMetalInstanceTemplateParameterDefinition{
 				{Name: "os_version", Required: true, Type: "type.googleapis.com/google.protobuf.StringValue"},
 			})
@@ -1017,7 +1017,7 @@ var _ = Describe("Private bare metal instances server", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			userKey := "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIUserProvidedKeyThatShouldBeOverridden user@test"
-			response, err := server.Create(ctx, privatev1.BareMetalInstancesCreateRequest_builder{
+			_, err = server.Create(ctx, privatev1.BareMetalInstancesCreateRequest_builder{
 				Object: privatev1.BareMetalInstance_builder{
 					Spec: privatev1.BareMetalInstanceSpec_builder{
 						CatalogItem:        catID,
@@ -1026,9 +1026,11 @@ var _ = Describe("Private bare metal instances server", func() {
 					}.Build(),
 				}.Build(),
 			}.Build())
-			Expect(err).ToNot(HaveOccurred())
-			Expect(response.GetObject().GetSpec().GetSshPublicKey()).To(Equal(testSSHPublicKey))
-			Expect(response.GetObject().GetSpec().GetTemplateParameters()).To(HaveKey("os_version"))
+			Expect(err).To(HaveOccurred())
+			st, ok := grpcstatus.FromError(err)
+			Expect(ok).To(BeTrue())
+			Expect(st.Code()).To(Equal(grpccodes.InvalidArgument))
+			Expect(st.Message()).To(ContainSubstring("not editable"))
 		})
 
 		It("Accepts editable field_definition alongside template_parameters", func() {

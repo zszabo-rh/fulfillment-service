@@ -68,7 +68,7 @@ type catalogItem interface {
 }
 
 // applyFieldDefinitions validates and applies field definitions from a catalog item against a resource spec.
-// Rejects any spec field not listed in field_definitions (except system fields catalog_item and template).
+// Rejects any spec field not listed in field_definitions (except system fields catalog_item, template and template_parameters).
 // For non-editable fields: rejects user-provided values; applies the catalog item default.
 // For editable fields with user values: validates against the JSON Schema.
 // For editable fields without user values: applies the catalog item default.
@@ -92,8 +92,9 @@ func applyFieldDefinitions(
 	}
 
 	allowedPaths := map[string]bool{
-		"catalog_item": true,
-		"template":     true,
+		"catalog_item":        true,
+		"template":            true,
+		"template_parameters": true,
 	}
 	for _, fd := range fieldDefinitions {
 		if fd.GetPath() != "" {

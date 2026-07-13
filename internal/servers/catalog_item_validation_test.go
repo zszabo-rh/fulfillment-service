@@ -165,11 +165,8 @@ var _ = Describe("applyFieldDefinitions", func() {
 		Expect(spec.GetIsWindows()).To(BeTrue())
 	})
 
-	It("forces is_windows value for non-editable field definition", func() {
-		falseVal := false
-		spec := &privatev1.ComputeInstanceSpec{
-			IsWindows: &falseVal,
-		}
+	It("applies non-editable default for bool field is_windows on compute instance spec", func() {
+		spec := &privatev1.ComputeInstanceSpec{}
 		defaultVal, err := structpb.NewValue(true)
 		Expect(err).ToNot(HaveOccurred())
 		fieldDefs := []*privatev1.FieldDefinition{{
