@@ -43,6 +43,25 @@ message BareMetalInstance {
   BareMetalInstanceStatus status = 4;
 }
 
+// Network attachment for a bare metal instance NIC.
+// Groups a subnet with security groups and a physical interface binding.
+message BareMetalNetworkAttachment {
+  // Fulfillment Subnet ID. Must reference a Subnet in READY state.
+  string subnet = 1;
+
+  // Fulfillment SecurityGroup IDs applied on this NIC.
+  // Each must be READY and belong to the same VirtualNetwork as the subnet.
+  repeated string security_groups = 2;
+
+  // Physical interface name from the HostType's NetworkInterface list.
+  // When omitted on a single-attachment instance, the system selects the first fabric-role interface.
+  optional string interface = 3;
+
+  // Designates this attachment as the default gateway for multi-NIC instances.
+  // When omitted on a single-attachment instance, that attachment is implicitly primary.
+  optional bool primary = 4;
+}
+
 // The spec contains the details of a bare metal instance as desired by the user.
 message BareMetalInstanceSpec {
   // Reference to the BareMetalInstanceCatalogItem. Required on create; immutable after creation.
@@ -70,6 +89,11 @@ message BareMetalInstanceSpec {
 
   // OS base image configuration.
   optional BareMetalInstanceImage image = 7 [(google.api.field_behavior) = IMMUTABLE];
+
+  // Network attachments for the bare metal instance. One entry per physical NIC.
+  // The list structure is immutable after creation (entries cannot be added or removed),
+  // but security_groups within each entry can be updated.
+  repeated BareMetalNetworkAttachment network_attachments = 8;
 }
 
 // The status contains the details of the bare metal instance provided by the system.
