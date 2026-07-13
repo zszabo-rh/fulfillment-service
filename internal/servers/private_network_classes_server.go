@@ -378,7 +378,7 @@ func (s *PrivateNetworkClassesServer) validateNetworkClass(ctx context.Context,
 	}
 
 	// NC-VAL-08: Validate defaults if present
-	if defaults := newNC.GetDefaults(); defaults != nil {
+	if defaults := newNC.GetSpec().GetDefaults(); defaults != nil {
 		if err := validateNetworkDefaults(defaults); err != nil {
 			return err
 		}
@@ -488,8 +488,11 @@ func applyNetworkClassUpdate(base, update *privatev1.NetworkClass, mask *fieldma
 			} else {
 				base.ClearK8SManager()
 			}
-		case "defaults":
-			base.SetDefaults(update.GetDefaults())
+		case "spec", "spec.defaults":
+			if base.GetSpec() == nil {
+				base.SetSpec(&privatev1.NetworkClassSpec{})
+			}
+			base.GetSpec().SetDefaults(update.GetSpec().GetDefaults())
 		default:
 			// For unknown paths, fall through - the generic handler will
 			// reject invalid paths if needed.

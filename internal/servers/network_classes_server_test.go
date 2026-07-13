@@ -981,7 +981,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC with defaults",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
@@ -991,11 +991,11 @@ var _ = Describe("Network classes server", func() {
 			It("Create with valid defaults persists and returns them", func() {
 				nc := createNetworkClassWithDefaults(validDefaults())
 
-				Expect(nc.GetDefaults()).ToNot(BeNil())
-				Expect(nc.GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
-				Expect(nc.GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
-				Expect(nc.GetDefaults().GetIngressRules()).To(HaveLen(1))
-				Expect(nc.GetDefaults().GetEgressRules()).To(HaveLen(1))
+				Expect(nc.GetSpec().GetDefaults()).ToNot(BeNil())
+				Expect(nc.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(nc.GetSpec().GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
+				Expect(nc.GetSpec().GetDefaults().GetIngressRules()).To(HaveLen(1))
+				Expect(nc.GetSpec().GetDefaults().GetEgressRules()).To(HaveLen(1))
 			})
 
 			It("Get after create returns defaults", func() {
@@ -1006,12 +1006,12 @@ var _ = Describe("Network classes server", func() {
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
 				retrieved := getResponse.GetObject()
-				Expect(retrieved.GetDefaults()).ToNot(BeNil())
-				Expect(retrieved.GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
-				Expect(retrieved.GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
-				Expect(retrieved.GetDefaults().GetIngressRules()).To(HaveLen(1))
-				Expect(retrieved.GetDefaults().GetIngressRules()[0].GetProtocol()).To(Equal(privatev1.Protocol_PROTOCOL_TCP))
-				Expect(retrieved.GetDefaults().GetIngressRules()[0].GetPortFrom()).To(BeNumerically("==", 22))
+				Expect(retrieved.GetSpec().GetDefaults()).ToNot(BeNil())
+				Expect(retrieved.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(retrieved.GetSpec().GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
+				Expect(retrieved.GetSpec().GetDefaults().GetIngressRules()).To(HaveLen(1))
+				Expect(retrieved.GetSpec().GetDefaults().GetIngressRules()[0].GetProtocol()).To(Equal(privatev1.Protocol_PROTOCOL_TCP))
+				Expect(retrieved.GetSpec().GetDefaults().GetIngressRules()[0].GetPortFrom()).To(BeNumerically("==", 22))
 			})
 
 			It("List after create returns defaults in items", func() {
@@ -1020,8 +1020,8 @@ var _ = Describe("Network classes server", func() {
 				listResponse, err := privateServer.List(ctx, privatev1.NetworkClassesListRequest_builder{}.Build())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(listResponse.GetItems()).To(HaveLen(1))
-				Expect(listResponse.GetItems()[0].GetDefaults()).ToNot(BeNil())
-				Expect(listResponse.GetItems()[0].GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(listResponse.GetItems()[0].GetSpec().GetDefaults()).ToNot(BeNil())
+				Expect(listResponse.GetItems()[0].GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
 			})
 
 			It("Update defaults via field mask replaces entire defaults", func() {
@@ -1034,17 +1034,17 @@ var _ = Describe("Network classes server", func() {
 
 				updateResponse, err := privateServer.Update(ctx, privatev1.NetworkClassesUpdateRequest_builder{
 					Object: privatev1.NetworkClass_builder{
-						Id:       nc.GetId(),
-						Defaults: newDefaults,
+						Id:   nc.GetId(),
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: newDefaults}.Build(),
 					}.Build(),
-					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"defaults"}},
+					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"spec.defaults"}},
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
 				updated := updateResponse.GetObject()
-				Expect(updated.GetDefaults().GetVirtualNetworkCidr()).To(Equal("172.16.0.0/12"))
-				Expect(updated.GetDefaults().GetSubnetCidr()).To(Equal("172.16.1.0/24"))
-				Expect(updated.GetDefaults().GetIngressRules()).To(BeEmpty())
-				Expect(updated.GetDefaults().GetEgressRules()).To(BeEmpty())
+				Expect(updated.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("172.16.0.0/12"))
+				Expect(updated.GetSpec().GetDefaults().GetSubnetCidr()).To(Equal("172.16.1.0/24"))
+				Expect(updated.GetSpec().GetDefaults().GetIngressRules()).To(BeEmpty())
+				Expect(updated.GetSpec().GetDefaults().GetEgressRules()).To(BeEmpty())
 			})
 
 			It("Update defaults to nil clears them", func() {
@@ -1054,15 +1054,15 @@ var _ = Describe("Network classes server", func() {
 					Object: privatev1.NetworkClass_builder{
 						Id: nc.GetId(),
 					}.Build(),
-					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"defaults"}},
+					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"spec.defaults"}},
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
-				Expect(updateResponse.GetObject().GetDefaults()).To(BeNil())
+				Expect(updateResponse.GetObject().GetSpec().GetDefaults()).To(BeNil())
 			})
 
 			It("Create without defaults succeeds", func() {
 				nc := createNetworkClass()
-				Expect(nc.GetDefaults()).To(BeNil())
+				Expect(nc.GetSpec().GetDefaults()).To(BeNil())
 			})
 
 			It("Defaults with CIDRs only succeeds", func() {
@@ -1071,8 +1071,8 @@ var _ = Describe("Network classes server", func() {
 					SubnetCidr:         "10.0.1.0/24",
 				}.Build()
 				nc := createNetworkClassWithDefaults(defaults)
-				Expect(nc.GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
-				Expect(nc.GetDefaults().GetIngressRules()).To(BeEmpty())
+				Expect(nc.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(nc.GetSpec().GetDefaults().GetIngressRules()).To(BeEmpty())
 			})
 
 			It("Defaults with rules only succeeds", func() {
@@ -1087,8 +1087,8 @@ var _ = Describe("Network classes server", func() {
 					},
 				}.Build()
 				nc := createNetworkClassWithDefaults(defaults)
-				Expect(nc.GetDefaults().GetVirtualNetworkCidr()).To(BeEmpty())
-				Expect(nc.GetDefaults().GetIngressRules()).To(HaveLen(1))
+				Expect(nc.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(BeEmpty())
+				Expect(nc.GetSpec().GetDefaults().GetIngressRules()).To(HaveLen(1))
 			})
 
 			It("Invalid virtual_network_cidr fails validation", func() {
@@ -1100,7 +1100,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC invalid VN CIDR",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1117,7 +1117,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC invalid subnet CIDR",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1134,7 +1134,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC subnet outside VN",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1150,7 +1150,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC subnet without VN",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1172,7 +1172,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC invalid rule protocol",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1194,7 +1194,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC TCP missing port_to",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1215,7 +1215,7 @@ var _ = Describe("Network classes server", func() {
 						Title:                  "NC invalid rule CIDR",
 						ImplementationStrategy: "ovn-kubernetes",
 						FabricManager:          "netris",
-						Defaults:               defaults,
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: defaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).To(HaveOccurred())
@@ -1230,10 +1230,10 @@ var _ = Describe("Network classes server", func() {
 				}.Build()
 				_, err := privateServer.Update(ctx, privatev1.NetworkClassesUpdateRequest_builder{
 					Object: privatev1.NetworkClass_builder{
-						Id:       nc.GetId(),
-						Defaults: invalidDefaults,
+						Id:   nc.GetId(),
+						Spec: privatev1.NetworkClassSpec_builder{Defaults: invalidDefaults}.Build(),
 					}.Build(),
-					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"defaults"}},
+					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"spec.defaults"}},
 				}.Build())
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("virtual_network_cidr"))
@@ -1247,16 +1247,16 @@ var _ = Describe("Network classes server", func() {
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
 				publicNC := getResponse.GetObject()
-				Expect(publicNC.GetDefaults()).ToNot(BeNil())
-				Expect(publicNC.GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
-				Expect(publicNC.GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
-				Expect(publicNC.GetDefaults().GetIngressRules()).To(HaveLen(1))
+				Expect(publicNC.GetSpec().GetDefaults()).ToNot(BeNil())
+				Expect(publicNC.GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(publicNC.GetSpec().GetDefaults().GetSubnetCidr()).To(Equal("10.0.1.0/24"))
+				Expect(publicNC.GetSpec().GetDefaults().GetIngressRules()).To(HaveLen(1))
 			})
 
 			It("Public API cannot set defaults via Update", func() {
 				// Create NC via private API (no defaults):
 				nc := createNetworkClass()
-				Expect(nc.GetDefaults()).To(BeNil())
+				Expect(nc.GetSpec().GetDefaults()).To(BeNil())
 
 				// Attempt to set defaults via public Update — inMapper should ignore the field:
 				publicDefaults := publicv1.NetworkDefaults_builder{
@@ -1267,7 +1267,7 @@ var _ = Describe("Network classes server", func() {
 					Object: publicv1.NetworkClass_builder{
 						Id:       nc.GetId(),
 						Title:    nc.GetTitle(),
-						Defaults: publicDefaults,
+						Spec: publicv1.NetworkClassSpec_builder{Defaults: publicDefaults}.Build(),
 					}.Build(),
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
@@ -1277,7 +1277,7 @@ var _ = Describe("Network classes server", func() {
 					Id: nc.GetId(),
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
-				Expect(getResponse.GetObject().GetDefaults()).To(BeNil())
+				Expect(getResponse.GetObject().GetSpec().GetDefaults()).To(BeNil())
 			})
 
 			It("Public Update preserves defaults set via private API", func() {
@@ -1295,8 +1295,8 @@ var _ = Describe("Network classes server", func() {
 					Id: nc.GetId(),
 				}.Build())
 				Expect(err).ToNot(HaveOccurred())
-				Expect(getResponse.GetObject().GetDefaults()).ToNot(BeNil())
-				Expect(getResponse.GetObject().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
+				Expect(getResponse.GetObject().GetSpec().GetDefaults()).ToNot(BeNil())
+				Expect(getResponse.GetObject().GetSpec().GetDefaults().GetVirtualNetworkCidr()).To(Equal("10.0.0.0/16"))
 				Expect(getResponse.GetObject().GetTitle()).To(Equal("Updated title"))
 			})
 		})

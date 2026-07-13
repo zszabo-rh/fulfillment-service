@@ -102,9 +102,9 @@ func (b *NetworkClassesServerBuilder) Build() (result *NetworkClassesServer, err
 		err = fmt.Errorf("failed to find the is_default field of type '%s'", ncDescriptor.FullName())
 		return
 	}
-	defaultsField := ncDescriptor.Fields().ByName("defaults")
-	if defaultsField == nil {
-		err = fmt.Errorf("failed to find the defaults field of type '%s'", ncDescriptor.FullName())
+	specField := ncDescriptor.Fields().ByName("spec")
+	if specField == nil {
+		err = fmt.Errorf("failed to find the spec field of type '%s'", ncDescriptor.FullName())
 		return
 	}
 
@@ -112,7 +112,7 @@ func (b *NetworkClassesServerBuilder) Build() (result *NetworkClassesServer, err
 	inMapper, err := NewGenericMapper[*publicv1.NetworkClass, *privatev1.NetworkClass]().
 		SetLogger(b.logger).
 		SetStrict(true).
-		AddIgnoredFields(isDefaultField.FullName(), defaultsField.FullName()).
+		AddIgnoredFields(isDefaultField.FullName(), specField.FullName()).
 		Build()
 	if err != nil {
 		return
