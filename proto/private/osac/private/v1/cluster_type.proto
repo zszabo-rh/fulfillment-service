@@ -42,6 +42,9 @@ message ClusterSpec {
   // Reference to a cluster catalog item. Mutually exclusive with template during the migration period.
   // When set, the server fetches the catalog item and applies its field definitions.
   string catalog_item = 8;
+
+  // Network attachment connecting this cluster to a tenant subnet.
+  ClusterNetworkAttachment network_attachment = 9;
 }
 
 // Networking configuration for a cluster.
@@ -83,6 +86,12 @@ enum ClusterConditionType {
   CLUSTER_CONDITION_TYPE_READY = 2;
   CLUSTER_CONDITION_TYPE_FAILED = 3;
   CLUSTER_CONDITION_TYPE_DEGRADED = 4;
+}
+
+// Network attachment for a cluster. See public API for full documentation.
+message ClusterNetworkAttachment {
+  string subnet = 1;
+  repeated string security_groups = 2;
 }
 
 message ClusterNodeSet {
