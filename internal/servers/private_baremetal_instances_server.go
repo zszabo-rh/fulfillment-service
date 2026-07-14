@@ -307,7 +307,7 @@ func (s *PrivateBareMetalInstancesServer) validateAndApplyTemplateParameters(ctx
 }
 
 // validateImmutability ensures catalog_item, ssh_public_key, user_data, template_parameters,
-// and image cannot be changed after creation.
+// image, external_ip_mode, and nat_gateway_mode cannot be changed after creation.
 func (s *PrivateBareMetalInstancesServer) validateImmutability(ctx context.Context,
 	request *privatev1.BareMetalInstancesUpdateRequest) error {
 	mask := request.GetUpdateMask()
@@ -316,13 +316,15 @@ func (s *PrivateBareMetalInstancesServer) validateImmutability(ctx context.Conte
 	updatingUserData := updateIncludesField(mask, "spec.user_data")
 	updatingTemplateParams := updateIncludesField(mask, "spec.template_parameters")
 	updatingImage := updateIncludesField(mask, "spec.image")
+	updatingExternalIPMode := updateIncludesField(mask, "spec.external_ip_mode")
+	updatingNATGatewayMode := updateIncludesField(mask, "spec.nat_gateway_mode")
 
 	bmi := request.GetObject()
 	if bmi == nil {
 		return grpcstatus.Errorf(grpccodes.InvalidArgument, "bare metal instance is mandatory")
 	}
 	newSpec := bmi.GetSpec()
-	if newSpec == nil && (updatingCatalogItem || updatingSshKey || updatingUserData || updatingTemplateParams || updatingImage) {
+	if newSpec == nil && (updatingCatalogItem || updatingSshKey || updatingUserData || updatingTemplateParams || updatingImage || updatingExternalIPMode || updatingNATGatewayMode) {
 		return grpcstatus.Errorf(grpccodes.InvalidArgument, "bare metal instance spec is mandatory")
 	}
 	id := bmi.GetId()
@@ -375,6 +377,16 @@ func (s *PrivateBareMetalInstancesServer) validateImmutability(ctx context.Conte
 	if updatingImage && !proto.Equal(existingSpec.GetImage(), newSpec.GetImage()) {
 		return grpcstatus.Errorf(grpccodes.InvalidArgument,
 			"cannot change spec.image: image is immutable after creation")
+	}
+
+	if updatingExternalIPMode && existingSpec.GetExternalIpMode() != newSpec.GetExternalIpMode() {
+		return grpcstatus.Errorf(grpccodes.InvalidArgument,
+			"cannot change spec.external_ip_mode: external_ip_mode is immutable after creation")
+	}
+
+	if updatingNATGatewayMode && existingSpec.GetNatGatewayMode() != newSpec.GetNatGatewayMode() {
+		return grpcstatus.Errorf(grpccodes.InvalidArgument,
+			"cannot change spec.nat_gateway_mode: nat_gateway_mode is immutable after creation")
 	}
 
 	return nil
