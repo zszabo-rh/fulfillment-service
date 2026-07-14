@@ -82,17 +82,11 @@ func Cmd() *cobra.Command {
 		"registry",
 		imageSourceTypeFlagHelp,
 	)
-	flags.StringVar(
-		&runner.args.externalIP,
-		"external-ip",
-		"",
-		externalIPFlagHelp,
-	)
-	flags.StringVar(
-		&runner.args.natGateway,
-		"nat-gateway",
-		"",
-		natGatewayFlagHelp,
+	flags.BoolVar(
+		&runner.args.externalIPAttachment,
+		"external-ip-attachment",
+		false,
+		externalIPAttachmentFlagHelp,
 	)
 
 	if err := result.MarkFlagRequired("catalog-item"); err != nil {
@@ -103,15 +97,14 @@ func Cmd() *cobra.Command {
 
 type runnerContext struct {
 	args struct {
-		name            string
-		catalogItem     string
-		sshKey          string
-		userData        string
-		runStrategy     string
-		imageSourceRef  string
-		imageSourceType string
-		externalIP      string
-		natGateway      string
+		name                 string
+		catalogItem          string
+		sshKey               string
+		userData             string
+		runStrategy          string
+		imageSourceRef       string
+		imageSourceType      string
+		externalIPAttachment bool
 	}
 	logger *slog.Logger
 }
@@ -160,26 +153,7 @@ func (c *runnerContext) run(cmd *cobra.Command, _ []string) error {
 		rs := publicv1.BareMetalInstanceRunStrategy(val)
 		spec.RunStrategy = &rs
 	}
-	if c.args.externalIP != "" {
-		val, ok := publicv1.ExternalIPMode_value["EXTERNAL_IP_MODE_"+strings.ToUpper(c.args.externalIP)]
-		if !ok {
-			return fmt.Errorf(
-				"unknown external IP mode %q, valid values are none and auto",
-				c.args.externalIP,
-			)
-		}
-		spec.ExternalIpMode = publicv1.ExternalIPMode(val)
-	}
-	if c.args.natGateway != "" {
-		val, ok := publicv1.NATGatewayMode_value["NAT_GATEWAY_MODE_"+strings.ToUpper(c.args.natGateway)]
-		if !ok {
-			return fmt.Errorf(
-				"unknown NAT gateway mode %q, valid values are none and auto",
-				c.args.natGateway,
-			)
-		}
-		spec.NatGatewayMode = publicv1.NATGatewayMode(val)
-	}
+	spec.AutoExternalIpAttachment = c.args.externalIPAttachment
 
 	bmi := publicv1.BareMetalInstance_builder{
 		Metadata: publicv1.Metadata_builder{
@@ -238,16 +212,8 @@ const imageSourceTypeFlagHelp = `
 _TYPE_ - Image source type.
 `
 
-const externalIPFlagHelp = `
-_MODE_ - Controls auto-provisioning of ExternalIP. Valid values are
-{{ bt }}none{{ bt }} (no auto-provisioning) and {{ bt }}auto{{ bt }}
-(auto-select pool and create ExternalIP with attachment). Immutable
-after creation.
-`
-
-const natGatewayFlagHelp = `
-_MODE_ - Controls auto-provisioning of NATGateway. Valid values are
-{{ bt }}none{{ bt }} (no auto-provisioning) and {{ bt }}auto{{ bt }}
-(auto-provision NATGateway for outbound connectivity). Immutable
-after creation.
+const externalIPAttachmentFlagHelp = `
+_[BOOLEAN]_ - When set, the system auto-selects an ExternalIPPool and
+creates an ExternalIP with an ExternalIPAttachment for this instance
+atomically during creation. Immutable after creation.
 `

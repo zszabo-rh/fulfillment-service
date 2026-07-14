@@ -19,9 +19,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 import "osac/private/v1/condition_status_type.proto";
-import "osac/private/v1/external_ip_mode_type.proto";
 import "osac/private/v1/metadata_type.proto";
-import "osac/private/v1/nat_gateway_mode_type.proto";
 
 // Contains the image configuration for a bare metal instance.
 message BareMetalInstanceImage {
@@ -97,16 +95,10 @@ message BareMetalInstanceSpec {
   // but security_groups within each entry can be updated.
   repeated BareMetalNetworkAttachment network_attachments = 8;
 
-  // Controls auto-provisioning of ExternalIP and ExternalIPAttachment.
-  // When set to AUTO, the system auto-selects an ExternalIPPool and creates an ExternalIP
-  // with an ExternalIPAttachment for this instance.
+  // When true, the system auto-selects an ExternalIPPool and creates an ExternalIP
+  // with an ExternalIPAttachment for this instance atomically during creation.
   // Immutable after creation.
-  ExternalIPMode external_ip_mode = 9 [(google.api.field_behavior) = IMMUTABLE];
-
-  // Controls auto-provisioning of NATGateway for outbound connectivity.
-  // When set to AUTO, the system auto-provisions a NATGateway for this instance.
-  // Immutable after creation.
-  NATGatewayMode nat_gateway_mode = 10 [(google.api.field_behavior) = IMMUTABLE];
+  bool auto_external_ip_attachment = 9 [(google.api.field_behavior) = IMMUTABLE];
 }
 
 // The status contains the details of the bare metal instance provided by the system.
