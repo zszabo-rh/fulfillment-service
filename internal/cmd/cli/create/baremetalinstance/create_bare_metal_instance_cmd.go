@@ -82,6 +82,12 @@ func Cmd() *cobra.Command {
 		"registry",
 		imageSourceTypeFlagHelp,
 	)
+	flags.BoolVar(
+		&runner.args.externalIPAttachment,
+		"external-ip-attachment",
+		false,
+		externalIPAttachmentFlagHelp,
+	)
 
 	if err := result.MarkFlagRequired("catalog-item"); err != nil {
 		panic(fmt.Sprintf("failed to mark catalog-item flag as required: %v", err))
@@ -91,13 +97,14 @@ func Cmd() *cobra.Command {
 
 type runnerContext struct {
 	args struct {
-		name            string
-		catalogItem     string
-		sshKey          string
-		userData        string
-		runStrategy     string
-		imageSourceRef  string
-		imageSourceType string
+		name                 string
+		catalogItem          string
+		sshKey               string
+		userData             string
+		runStrategy          string
+		imageSourceRef       string
+		imageSourceType      string
+		externalIPAttachment bool
 	}
 	logger *slog.Logger
 }
@@ -146,6 +153,7 @@ func (c *runnerContext) run(cmd *cobra.Command, _ []string) error {
 		rs := publicv1.BareMetalInstanceRunStrategy(val)
 		spec.RunStrategy = &rs
 	}
+	spec.AutoExternalIpAttachment = c.args.externalIPAttachment
 
 	bmi := publicv1.BareMetalInstance_builder{
 		Metadata: publicv1.Metadata_builder{
@@ -202,4 +210,10 @@ _URL_ - Image reference, for example an OCI image URL.
 
 const imageSourceTypeFlagHelp = `
 _TYPE_ - Image source type.
+`
+
+const externalIPAttachmentFlagHelp = `
+_[BOOLEAN]_ - When set, the system auto-selects an ExternalIPPool and
+creates an ExternalIP with an ExternalIPAttachment for this instance
+atomically during creation. Immutable after creation.
 `

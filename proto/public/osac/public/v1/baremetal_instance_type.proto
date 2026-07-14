@@ -130,6 +130,11 @@ message BareMetalInstanceSpec {
   // The list structure is immutable after creation (entries cannot be added or removed),
   // but security_groups within each entry can be updated.
   repeated BareMetalNetworkAttachment network_attachments = 8;
+
+  // When true, the system auto-selects an ExternalIPPool and creates an ExternalIP
+  // with an ExternalIPAttachment for this instance atomically during creation.
+  // Immutable after creation.
+  bool auto_external_ip_attachment = 9 [(google.api.field_behavior) = IMMUTABLE];
 }
 
 // The status contains the details of the bare metal instance provided by the system.
